@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, X, Play, Music, User, Disc, ListMusic, ArrowRight, CornerDownLeft } from 'lucide-react';
+import { Search, X, Play, Music, User, Disc, ListMusic, ArrowRight, CornerDownLeft, Plus } from 'lucide-react';
 import { usePlayerStore } from '../../stores/playerStore';
+import { useJamStore } from '../../lib/jam/jamStore';
 import { Song, Album, Artist, Playlist, SearchResults } from '../../lib/music/types';
 
 interface SearchModalProps {
@@ -11,7 +12,8 @@ interface SearchModalProps {
 }
 
 export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSelectAlbum, onSelectPlaylist }) => {
-  const { searchModalOpen, setSearchModalOpen, playTrack, currentTrack } = usePlayerStore();
+  const { searchModalOpen, setSearchModalOpen, playTrack, currentTrack, setJamModalOpen } = usePlayerStore();
+  const { session: jamSession, broadcastAddToQueue } = useJamStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -71,8 +73,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
       } else if (e.key === 'Enter') {
         if (songs[selectedIndex]) {
           e.preventDefault();
-          playTrack(songs[selectedIndex]);
-          setSearchModalOpen(false);
+          handleSongSelect(songs[selectedIndex]);
         }
       }
     };
@@ -82,6 +83,18 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
   }, [searchModalOpen, selectedIndex, songs, playTrack, setSearchModalOpen]);
 
   if (!searchModalOpen) return null;
+
+  // If a Jam session is active, add songs to the Jam queue instead of playing locally
+  const handleSongSelect = (song: Song) => {
+    if (jamSession) {
+      broadcastAddToQueue(song);
+      setSearchModalOpen(false);
+      setJamModalOpen(true); // Re-open Jam modal to see the queue
+    } else {
+      playTrack(song);
+      setSearchModalOpen(false);
+    }
+  };
 
   return (
     <div 
@@ -134,8 +147,8 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
           {!isLoading && songs.length > 0 && (
             <div>
               <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
-                <span>Songs ({songs.length})</span>
-                <span className="text-[10px] text-slate-500 hidden sm:inline">Use ↑ ↓ and Enter to play</span>
+                <span>{jamSession ? 'Tap to add to Jam queue' : 'Songs'} ({songs.length})</span>
+                <span className="text-[10px] text-slate-500 hidden sm:inline">{jamSession ? 'Adds to car queue' : 'Use ↑ ↓ and Enter to play'}</span>
               </div>
               <div className="space-y-1">
                 {songs.map((song, i) => {
@@ -144,10 +157,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
                   return (
                     <div
                       key={`${song.id}-${i}`}
-                      onClick={() => {
-                        playTrack(song);
-                        setSearchModalOpen(false);
-                      }}
+                      onClick={() => handleSongSelect(song)}
                       className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-colors ${
                         isSelected
                           ? 'bg-[var(--aura-primary,#6366f1)]/20 border border-[var(--aura-primary,#6366f1)]/30'
@@ -179,8 +189,11 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
 
                       {isSelected && (
                         <div className="hidden sm:flex items-center gap-1 text-[11px] text-[var(--aura-primary,#6366f1)] font-mono pr-2">
-                          <CornerDownLeft className="w-3.5 h-3.5" />
-                          <span>Play</span>
+                          {jamSession ? (
+                            <><Plus className="w-3.5 h-3.5" /><span>Add</span></>
+                          ) : (
+                            <><CornerDownLeft className="w-3.5 h-3.5" /><span>Play</span></>
+                          )}
                         </div>
                       )}
                     </div>

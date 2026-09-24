@@ -233,13 +233,13 @@ export const Shell: React.FC<ShellProps> = ({ currentTab, onTabChange, children 
         </div>
       )}
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6">
+      {/* Main Content Area — extra bottom padding on mobile to clear nav + MiniPlayer */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6 pb-44 md:pb-6">
         {children}
       </main>
 
-      {/* Mobile Fixed Bottom Navigation Tab Bar (375px–430px thumb ergonomics) */}
-      <div className="md:hidden fixed bottom-18 left-0 right-0 z-30 bg-[#0d0f17]/95 backdrop-blur-xl border-t border-white/[0.08] px-4 py-2 flex items-center justify-around shadow-2xl">
+      {/* Mobile Fixed Bottom Navigation Tab Bar — sits ABOVE the MiniPlayer */}
+      <div className="md:hidden fixed bottom-[84px] left-0 right-0 z-30 bg-[#0d0f17]/95 backdrop-blur-xl border-t border-white/[0.08] px-4 py-2 flex items-center justify-around shadow-2xl">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;

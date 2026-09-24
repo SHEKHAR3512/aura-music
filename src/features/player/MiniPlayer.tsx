@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { 
   Play, 
   Pause, 
@@ -22,6 +22,7 @@ import { usePlayerStore } from '../../stores/playerStore';
 import { useJamStore } from '../../lib/jam/jamStore';
 import { useAudioTime, formatTime } from '../../hooks/useAudioTime';
 import { SafeImage } from '../../components/ui/SafeImage';
+import { triggerHaptic } from '../../lib/utils/haptics';
 
 export const MiniPlayer: React.FC = () => {
   const { session: jamSession } = useJamStore();
@@ -64,6 +65,44 @@ export const MiniPlayer: React.FC = () => {
   const [hoverPosition, setHoverPosition] = useState<number>(0);
   const [isHoveringBar, setIsHoveringBar] = useState(false);
 
+  // Touch swipe state for mobile forward/backward
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const isSwiping = useRef<boolean>(false);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    isSwiping.current = false;
+    setSwipeOffset(0);
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const dx = e.touches[0].clientX - touchStartX.current;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    // Only track horizontal swipes (ignore vertical scrolling)
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+      isSwiping.current = true;
+      setSwipeOffset(Math.max(-80, Math.min(80, dx)));
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (isSwiping.current) {
+      const SWIPE_THRESHOLD = 50;
+      if (swipeOffset < -SWIPE_THRESHOLD) {
+        triggerHaptic('skipForward');
+        nextTrack();
+      } else if (swipeOffset > SWIPE_THRESHOLD) {
+        triggerHaptic('skipBack');
+        prevTrack();
+      }
+    }
+    isSwiping.current = false;
+    setSwipeOffset(0);
+  }, [swipeOffset, nextTrack, prevTrack]);
+
   if (!currentTrack) return null;
 
   const isLiked = likedSongIds.includes(currentTrack.id);
@@ -93,6 +132,9 @@ export const MiniPlayer: React.FC = () => {
       style={{
         boxShadow: '0 -10px 40px -10px var(--aura-glow, rgba(0,0,0,0.5))',
       }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Precision Scrub Bar with Hover Timestamp */}
       <div 
@@ -128,7 +170,10 @@ export const MiniPlayer: React.FC = () => {
         )}
       </div>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 h-[72px] flex items-center justify-between gap-3 sm:gap-6">
+      <div 
+        className="max-w-7xl mx-auto px-3 sm:px-6 h-[72px] flex items-center justify-between gap-3 sm:gap-6 transition-transform duration-150"
+        style={{ transform: swipeOffset ? `translateX(${swipeOffset}px)` : undefined, opacity: swipeOffset ? 0.7 : 1 }}
+      >
         
         {/* Track Info (Zone 1) */}
         <div className="flex items-center gap-3 sm:gap-4 min-w-0 max-w-[35%] sm:max-w-[30%]">
