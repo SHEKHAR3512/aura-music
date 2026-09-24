@@ -21,13 +21,15 @@ import {
   QrCode,
   Activity,
   SlidersHorizontal,
-  ChevronRight
+  ChevronRight,
+  Camera
 } from 'lucide-react';
 import { useJamStore, JamMember } from '../../lib/jam/jamStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useLibraryStore } from '../../lib/storage/libraryStore';
 import { JamQRCodeCard } from './JamQRCodeCard';
 import { JamActivityFeed } from './JamActivityFeed';
+import { QRCodeScanner } from './QRCodeScanner';
 import { CrossfadeSettingSlider } from '../audio/CrossfadeSettingSlider';
 import { triggerHaptic } from '../../lib/utils/haptics';
 
@@ -67,6 +69,7 @@ export const GroupPlayModal: React.FC = () => {
   const [sessionName, setSessionName] = useState("Shekhar's Car Jam");
   const [joinCode, setJoinCode] = useState('');
   const [copied, setCopied] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   // Check if user opened app via a scanned QR code URL (?jam=JAM-XXXX)
   useEffect(() => {
@@ -98,6 +101,14 @@ export const GroupPlayModal: React.FC = () => {
     e.preventDefault();
     if (!joinCode.trim()) return;
     await joinSession(joinCode.trim(), userName, avatar);
+    setSessionTab('controls');
+  };
+
+  const handleScannedCode = async (scannedCode: string) => {
+    setJoinCode(scannedCode);
+    setShowScanner(false);
+    triggerHaptic('selection');
+    await joinSession(scannedCode, userName, avatar);
     setSessionTab('controls');
   };
 
@@ -748,42 +759,68 @@ export const GroupPlayModal: React.FC = () => {
 
               {/* JOIN TAB */}
               {activeTab === 'join' && (
-                <form onSubmit={handleJoin} className="space-y-4">
-                  <div>
-                    <label className="text-xs font-medium text-slate-300 block mb-1">
-                      Enter 4-Character Jam Code
-                    </label>
-                    <input
-                      type="text"
-                      value={joinCode}
-                      onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                      placeholder="e.g. JAM-CAR9"
-                      required
-                      maxLength={10}
-                      className="w-full h-12 text-center tracking-widest text-lg font-mono bg-white/5 border border-white/10 rounded-xl text-white uppercase focus:outline-none focus:border-emerald-400"
+                <div className="space-y-4">
+                  {showScanner ? (
+                    <QRCodeScanner
+                      onScan={handleScannedCode}
+                      onClose={() => setShowScanner(false)}
                     />
-                  </div>
+                  ) : (
+                    <form onSubmit={handleJoin} className="space-y-4">
+                      {/* Prominent Camera Scan Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic('button');
+                          setShowScanner(true);
+                        }}
+                        className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-emerald-500/10 border border-emerald-500/40 hover:border-emerald-500/70 text-emerald-300 font-bold text-sm flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-500/10 hover:bg-emerald-500/25 active:scale-[0.99] transition-all cursor-pointer group"
+                      >
+                        <Camera className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                        <span>Scan Host's QR Code with Camera</span>
+                      </button>
 
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2.5 text-xs text-emerald-300">
-                    <QrCode className="w-4 h-4 shrink-0 text-emerald-400" />
-                    <span>Tip: You can also point your phone camera at the driver's QR code to join instantly without typing!</span>
-                  </div>
+                      {/* Divider */}
+                      <div className="flex items-center gap-3 my-2">
+                        <div className="flex-1 h-px bg-white/10" />
+                        <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+                          Or enter code manually
+                        </span>
+                        <div className="flex-1 h-px bg-white/10" />
+                      </div>
 
-                  <button
-                    type="submit"
-                    disabled={isConnecting || !joinCode.trim()}
-                    className="w-full h-12 rounded-xl bg-white text-slate-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg hover:bg-slate-100 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {isConnecting ? (
-                      <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <Smartphone className="w-4 h-4" />
-                        <span>Connect & Join Car Jam</span>
-                      </>
-                    )}
-                  </button>
-                </form>
+                      <div>
+                        <label className="text-xs font-medium text-slate-300 block mb-1">
+                          Enter 4-Character Jam Code
+                        </label>
+                        <input
+                          type="text"
+                          value={joinCode}
+                          onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                          placeholder="e.g. JAM-CAR9"
+                          required
+                          maxLength={10}
+                          className="w-full h-12 text-center tracking-widest text-lg font-mono bg-white/5 border border-white/10 rounded-xl text-white uppercase focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isConnecting || !joinCode.trim()}
+                        className="w-full h-12 rounded-xl bg-white text-slate-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg hover:bg-slate-100 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {isConnecting ? (
+                          <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <Smartphone className="w-4 h-4" />
+                            <span>Connect & Join Car Jam</span>
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  )}
+                </div>
               )}
             </div>
           )}
