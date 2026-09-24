@@ -1,0 +1,6 @@
+{
+  "name": "AURA — Next-Gen Cinematic Music Experience",
+  "description": "A premium next-generation web music platform with cinematic visualizers, synced lyrics, studio EQ, smart queuing, and rich music discovery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

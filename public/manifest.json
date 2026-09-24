@@ -1,0 +1,25 @@
+{
+  "id": "/",
+  "name": "AURA — Next-Gen Music Experience",
+  "short_name": "AURA Sound",
+  "description": "Premium next-generation web music platform with cinematic visualizers, studio EQ, and offline browsing.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#08090d",
+  "background_color": "#08090d",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=192&auto=format&fit=crop&q=80",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=512&auto=format&fit=crop&q=80",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}
