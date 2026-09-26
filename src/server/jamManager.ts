@@ -1,6 +1,7 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { IncomingMessage, Server } from 'http';
 import { Song } from '../lib/music/types';
+import { JamRoomState } from '../features/jam/types/jam.types';
 
 export interface JamMember {
   id: string; // deviceId
@@ -42,13 +43,17 @@ export interface JamSession {
 export interface ClientSocket extends WebSocket {
   deviceId?: string;
   sessionId?: string;
+  roomId?: string;
   isAlive?: boolean;
 }
 
 class JamSessionManager {
   private sessions = new Map<string, JamSession>();
   private sockets = new Map<string, Set<ClientSocket>>(); // sessionId -> Set of sockets
+  private roomSockets = new Map<string, Set<ClientSocket>>(); // roomId -> Set of sockets
+  private nextGenRooms = new Map<string, JamRoomState>();
   private wss: WebSocketServer | null = null;
+
 
   public init(server: Server) {
     this.wss = new WebSocketServer({ server, path: '/ws/jam' });
@@ -344,7 +349,169 @@ class JamSessionManager {
         }
         break;
       }
+
+      // Next-Gen Jam Listening Room Messages
+      case 'jam:room_subscribe': {
+        const roomId = data?.roomId?.toUpperCase();
+        if (roomId) {
+          ws.roomId = roomId;
+          this.addSocketToRoom(roomId, ws);
+          const roomState = this.nextGenRooms.get(roomId);
+          if (roomState) {
+            this.sendToSocket(ws, 'jam:room_state', { state: roomState });
+          }
+        }
+        break;
+      }
+
+      case 'jam:playback_update': {
+        const { roomId, playback, sequenceNumber } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && playback) {
+          room.playback = { ...room.playback, ...playback, updatedAt: Date.now() };
+          room.sequenceNumber = sequenceNumber || (room.sequenceNumber + 1);
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:queue_add': {
+        const { roomId, item, queue } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room) {
+          room.queue = queue || [...room.queue, item];
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:queue_set': {
+        const { roomId, queue } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && queue) {
+          room.queue = queue;
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:reaction': {
+        const { roomId, reaction } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && reaction) {
+          room.reactions = [...room.reactions.slice(-30), reaction];
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:activity': {
+        const { roomId, event } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && event) {
+          room.activity = [event, ...room.activity.slice(0, 49)];
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:settings_update': {
+        const { roomId, settings } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && settings) {
+          room.settings = { ...room.settings, ...settings };
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:vote_skip': {
+        const { roomId, votes } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room) {
+          room.skipVotes = votes || [];
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:heartbeat': {
+        const { roomId, participant } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && participant) {
+          room.participants[participant.id] = {
+            ...room.participants[participant.id],
+            ...participant,
+            lastSeen: Date.now(),
+            isOnline: true,
+          };
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:transfer_host': {
+        const { roomId, newHostId } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && newHostId) {
+          room.metadata.hostId = newHostId;
+          if (room.participants[newHostId]) {
+            room.participants[newHostId].role = 'host';
+          }
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:end_room': {
+        const { roomId } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room) {
+          room.metadata.active = false;
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
     }
+  }
+
+  public setRoomState(roomId: string, state: JamRoomState) {
+    this.nextGenRooms.set(roomId.toUpperCase(), state);
+    this.broadcastToRoom(roomId, 'jam:room_state', { state });
+  }
+
+  public getRoomState(roomId: string): JamRoomState | undefined {
+    return this.nextGenRooms.get(roomId.toUpperCase());
+  }
+
+  private addSocketToRoom(roomId: string, ws: ClientSocket) {
+    const key = roomId.toUpperCase();
+    if (!this.roomSockets.has(key)) {
+      this.roomSockets.set(key, new Set());
+    }
+    this.roomSockets.get(key)!.add(ws);
+  }
+
+  public broadcastToRoom(roomId: string, type: string, payload: any) {
+    const key = roomId.toUpperCase();
+    const socketSet = this.roomSockets.get(key);
+    if (!socketSet) return;
+    const msg = JSON.stringify({ type, data: payload });
+    socketSet.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(msg);
+      }
+    });
   }
 
   public createSession(
@@ -443,6 +610,16 @@ class JamSessionManager {
         }
       }
       this.leaveSession(ws.sessionId, ws.deviceId);
+    }
+
+    if (ws.roomId) {
+      const rSockets = this.roomSockets.get(ws.roomId.toUpperCase());
+      if (rSockets) {
+        rSockets.delete(ws);
+        if (rSockets.size === 0) {
+          this.roomSockets.delete(ws.roomId.toUpperCase());
+        }
+      }
     }
   }
 

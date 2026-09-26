@@ -15,7 +15,7 @@ import {
 import { usePlayerStore } from '../../stores/playerStore';
 import { useLibraryStore } from '../../lib/storage/libraryStore';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
-import { useJamStore } from '../../lib/jam/jamStore';
+import { useJamStore } from '../../features/jam/store/useJamStore';
 
 interface ShellProps {
   currentTab: string;
@@ -24,7 +24,7 @@ interface ShellProps {
 }
 
 export const Shell: React.FC<ShellProps> = ({ currentTab, onTabChange, children }) => {
-  const { session: jamSession } = useJamStore();
+  const { room } = useJamStore();
   const { isOnline, isForcedOffline, toggleForcedOffline } = useNetworkStatus();
   const {
     togglePlay,
@@ -155,20 +155,20 @@ export const Shell: React.FC<ShellProps> = ({ currentTab, onTabChange, children 
 
         {/* Zone 3: Primary Actions (Search Trigger, Studio EQ, Profile) */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Car Group Play Trigger */}
+          {/* Aura Jam Listening Room Trigger */}
           <button
             onClick={() => setJamModalOpen(true)}
-            aria-label="Car Group Play"
-            title="Car Group Play / Multi-Device Jam"
+            aria-label="Aura Jam Listening Room"
+            title="Realtime Collaborative Listening Room"
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              jamSession 
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm' 
+              room 
+                ? 'bg-[var(--aura-primary,#6366f1)]/20 text-indigo-300 border border-[var(--aura-primary,#6366f1)]/40 shadow-sm' 
                 : 'bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300'
             }`}
           >
-            <Car className={`w-3.5 h-3.5 ${jamSession ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
+            <Radio className={`w-3.5 h-3.5 ${room ? 'text-[var(--aura-primary,#6366f1)] animate-pulse' : 'text-slate-400'}`} />
             <span className="hidden sm:inline">
-              {jamSession ? `Car Jam (${jamSession.members.length})` : 'Group Play'}
+              {room ? `Jam (${Object.keys(room.participants || {}).length})` : 'Aura Jam'}
             </span>
           </button>
 

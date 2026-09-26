@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Jam History: read accessible to participants, write allowed for valid summaries
+    match /jamHistory/{roomId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false; // Audit trail preserved
+    }
+
+    // User profiles & libraries
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+
+      match /playlists/{playlistId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /stats/{statId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Public curated playlists and charts
+    match /playlists/{playlistId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

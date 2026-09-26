@@ -47,11 +47,26 @@ class AudioEngine {
   private crossfadeDuration = 2; // seconds
 
   constructor() {
-    this.audio = new Audio();
-    this.audio.preload = 'auto';
-    this.audio.crossOrigin = 'anonymous';
-
-    this.setupAudioListeners();
+    if (typeof window !== 'undefined' && typeof Audio !== 'undefined') {
+      this.audio = new Audio();
+      this.audio.preload = 'auto';
+      this.audio.crossOrigin = 'anonymous';
+      this.setupAudioListeners();
+    } else {
+      this.audio = {
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        play: () => Promise.resolve(),
+        pause: () => {},
+        load: () => {},
+        currentTime: 0,
+        duration: 0,
+        volume: 1,
+        playbackRate: 1,
+        paused: true,
+        buffered: { length: 0, end: () => 0 },
+      } as any;
+    }
   }
 
   private setupAudioListeners() {

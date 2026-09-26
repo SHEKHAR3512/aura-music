@@ -1,0 +1,63 @@
+{
+  "rules": {
+    "jams": {
+      "$roomId": {
+        // Any authenticated user or anonymous visitor with room link can read active room state
+        ".read": "auth != null",
+        
+        "metadata": {
+          // Only the original room creator or designated host can write/update room metadata
+          ".write": "auth != null && (!data.exists() || data.child('hostId').val() === auth.uid)"
+        },
+
+        "playback": {
+          // Host can always update playback.
+          // Guests can update playback ONLY if guest pause/seek/skip settings are enabled in the room.
+          ".write": "auth != null && (root.child('jams').child($roomId).child('metadata').child('hostId').val() === auth.uid || (root.child('jams').child($roomId).child('settings').child('allowGuestPause').val() === true && newData.child('playbackVersion').val() > data.child('playbackVersion').val()))"
+        },
+
+        "queue": {
+          // Host or guests allowed by allowGuestQueue
+          ".write": "auth != null && (root.child('jams').child($roomId).child('metadata').child('hostId').val() === auth.uid || root.child('jams').child($roomId).child('settings').child('allowGuestQueue').val() === true)"
+        },
+
+        "participants": {
+          "$userId": {
+            // A user can ONLY create, update, or disconnect their OWN participant presence
+            ".write": "auth != null && (auth.uid === $userId || root.child('jams').child($roomId).child('metadata').child('hostId').val() === auth.uid)",
+            ".validate": "newData.hasChildren(['displayName', 'avatar', 'isOnline'])"
+          }
+        },
+
+        "settings": {
+          // Strictly restricted to the room host
+          ".write": "auth != null && root.child('jams').child($roomId).child('metadata').child('hostId').val() === auth.uid"
+        },
+
+        "reactions": {
+          // Authenticated or guest participants can submit reactions with rate-limit validation
+          "$reactionId": {
+            ".write": "auth != null && newData.child('userId').val() === auth.uid"
+          }
+        },
+
+        "activity": {
+          "$activityId": {
+            ".write": "auth != null && newData.child('actorId').val() === auth.uid"
+          }
+        },
+
+        "skipVotes": {
+          // Participants can add their vote
+          ".write": "auth != null"
+        },
+
+        "songRequests": {
+          "$requestId": {
+            ".write": "auth != null && (newData.child('requestedBy').child('id').val() === auth.uid || root.child('jams').child($roomId).child('metadata').child('hostId').val() === auth.uid)"
+          }
+        }
+      }
+    }
+  }
+}

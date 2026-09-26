@@ -254,6 +254,79 @@ app.get('/api/music/related/:id', async (req: Request, res: Response) => {
 // JAM / GROUP PLAY REST API ENDPOINTS
 // -------------------------------------------------------------
 
+// NTP Clock Calibration Ping Endpoint
+app.all('/api/jam/ping', (req: Request, res: Response) => {
+  const clientTime = req.query.clientTime
+    ? Number(req.query.clientTime)
+    : req.body?.pingTimestamp || req.body?.clientTime || Date.now();
+  res.json({
+    serverTimestamp: Date.now(),
+    clientTime,
+  });
+});
+
+// Next-Gen Jam Listening Room Creation Endpoint
+app.post('/api/jam/create-room', (req: Request, res: Response) => {
+  const state = req.body;
+  if (state?.metadata?.id) {
+    jamManager.setRoomState(state.metadata.id, state);
+  }
+  res.json({ success: true });
+});
+
+// Next-Gen Jam Listening Room Action Endpoint (Dual Transport Fallback)
+app.post('/api/jam/room-action', (req: Request, res: Response) => {
+  const { type, data } = req.body;
+  const roomId = data?.roomId;
+  if (roomId) {
+    const room = jamManager.getRoomState(roomId);
+    if (room) {
+      if (type === 'PLAYBACK_UPDATE') {
+        room.playback = { ...room.playback, ...data.playback, updatedAt: Date.now() };
+        room.sequenceNumber = data.sequenceNumber || (room.sequenceNumber + 1);
+        room.serverTimestamp = Date.now();
+      } else if (type === 'QUEUE_ADD') {
+        room.queue = data.queue || [...room.queue, data.item];
+        room.serverTimestamp = Date.now();
+      } else if (type === 'QUEUE_SET') {
+        room.queue = data.queue;
+        room.serverTimestamp = Date.now();
+      } else if (type === 'REACTION') {
+        room.reactions = [...room.reactions.slice(-30), data.reaction];
+        room.serverTimestamp = Date.now();
+      } else if (type === 'ACTIVITY') {
+        room.activity = [data.event, ...room.activity.slice(0, 49)];
+        room.serverTimestamp = Date.now();
+      } else if (type === 'SETTINGS_UPDATE') {
+        room.settings = { ...room.settings, ...data.settings };
+        room.serverTimestamp = Date.now();
+      } else if (type === 'VOTE_SKIP') {
+        room.skipVotes = data.votes || [];
+        room.serverTimestamp = Date.now();
+      } else if (type === 'HEARTBEAT' && data.participant) {
+        room.participants[data.participant.id] = {
+          ...room.participants[data.participant.id],
+          ...data.participant,
+          lastSeen: Date.now(),
+          isOnline: true,
+        };
+        room.serverTimestamp = Date.now();
+      } else if (type === 'TRANSFER_HOST') {
+        room.metadata.hostId = data.newHostId;
+        if (room.participants[data.newHostId]) {
+          room.participants[data.newHostId].role = 'host';
+        }
+        room.serverTimestamp = Date.now();
+      } else if (type === 'END_ROOM') {
+        room.metadata.active = false;
+        room.serverTimestamp = Date.now();
+      }
+      jamManager.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+    }
+  }
+  res.json({ success: true });
+});
+
 app.post('/api/jam/create', (req: Request, res: Response) => {
   const { name, deviceId, userName, avatar, currentTrack, queue } = req.body;
   const session = jamManager.createSession(
