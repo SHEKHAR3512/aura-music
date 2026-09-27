@@ -57,17 +57,6 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vitest": "^5.0.2"
-  },
-  "optionalDependencies": {
-    "@esbuild/linux-x64": "^0.28.0",
-    "@esbuild/win32-x64": "^0.28.0",
-    "@rolldown/binding-linux-x64-gnu": "1.2.11",
-    "@rolldown/binding-win32-x64-msvc": "1.2.11",
-    "@tailwindcss/oxide-linux-x64-gnu": "^4.3.3",
-    "@tailwindcss/oxide-win32-x64-msvc": "^4.3.3",
-    "@typescript/typescript-linux-x64": "^7.0.2",
-    "@typescript/typescript-win32-x64": "^7.0.2",
-    "lightningcss-linux-x64-gnu": "^1.33.0",
-    "lightningcss-win32-x64-msvc": "^1.33.0"
   }
 }
+
