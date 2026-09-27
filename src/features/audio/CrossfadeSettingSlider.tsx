@@ -1,7 +1,7 @@
 import React from 'react';
 import { Zap, Radio, Sliders, Car, Sparkles, Check } from 'lucide-react';
 import { usePlayerStore } from '../../stores/playerStore';
-import { useJamStore } from '../../lib/jam/jamStore';
+import { useJamStore } from '../jam/store/useJamStore';
 import { triggerHaptic } from '../../lib/utils/haptics';
 
 interface CrossfadeSettingSliderProps {
@@ -24,22 +24,16 @@ export const CrossfadeSettingSlider: React.FC<CrossfadeSettingSliderProps> = ({
   inJamSessionModal = false,
 }) => {
   const { crossfadeSeconds, setCrossfade } = usePlayerStore();
-  const { session: jamSession, broadcastSetCrossfade } = useJamStore();
+  const { room: jamRoom } = useJamStore();
 
   const handleSliderChange = (newVal: number) => {
     triggerHaptic('seek');
     setCrossfade(newVal);
-    if (jamSession) {
-      broadcastSetCrossfade(newVal);
-    }
   };
 
   const handlePresetClick = (seconds: number) => {
     triggerHaptic('button');
     setCrossfade(seconds);
-    if (jamSession) {
-      broadcastSetCrossfade(seconds);
-    }
   };
 
   // Helper description based on active duration
@@ -72,7 +66,7 @@ export const CrossfadeSettingSlider: React.FC<CrossfadeSettingSliderProps> = ({
               <h4 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">
                 Gapless Crossfade Transition
               </h4>
-              {jamSession && (
+              {jamRoom && (
                 <span className="hidden xs:inline-flex px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
                   JAM SYNCED
                 </span>
@@ -225,11 +219,11 @@ export const CrossfadeSettingSlider: React.FC<CrossfadeSettingSliderProps> = ({
 
       {/* Jam Collaborative Status / Benefit Text */}
       <div className="mt-3.5 pt-2.5 border-t border-white/5 flex items-start gap-2 text-[11px] text-slate-400">
-        <Car className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${jamSession ? 'text-emerald-400' : 'text-slate-500'}`} />
+        <Car className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${jamRoom ? 'text-emerald-400' : 'text-slate-500'}`} />
         <p className="leading-relaxed">
-          {jamSession ? (
+          {jamRoom ? (
             <span>
-              <strong className="text-white font-medium">Car Jam Active ({jamSession.name}):</strong> Adjusting this slider syncs the gapless transition duration across all passengers and the car speaker in real time.
+              <strong className="text-white font-medium">Car Jam Active ({jamRoom.metadata.name}):</strong> Adjusting this slider syncs the gapless transition duration across all passengers and the car speaker in real time.
             </span>
           ) : (
             <span>

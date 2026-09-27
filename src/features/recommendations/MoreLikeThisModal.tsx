@@ -14,11 +14,12 @@ import {
   Share2,
   ListPlus,
   Sliders,
-  Compass
+  Compass,
+  ArrowLeft
 } from 'lucide-react';
 import { Song } from '../../lib/music/types';
 import { usePlayerStore } from '../../stores/playerStore';
-import { useJamStore } from '../../lib/jam/jamStore';
+import { useJamStore } from '../jam/store/useJamStore';
 import { offlineMetadataCache } from '../../lib/storage/offlineMetadataCache';
 import { SafeImage } from '../../components/ui/SafeImage';
 
@@ -47,7 +48,7 @@ export const MoreLikeThisModal: React.FC = () => {
     toggleLike
   } = usePlayerStore();
 
-  const { session: jamSession, broadcastPlayTrack, broadcastAddToQueue } = useJamStore();
+  const { room: jamRoom } = useJamStore();
 
   const [activeTab, setActiveTab] = useState<'all' | 'artist' | 'genre'>('all');
   const [loading, setLoading] = useState(false);
@@ -100,14 +101,12 @@ export const MoreLikeThisModal: React.FC = () => {
     };
   }, [moreLikeThisOpen, currentTrack?.id]);
 
-  if (!moreLikeThisOpen || !currentTrack) return null;
-
-  const currentList = 
-    activeTab === 'artist' 
-      ? (data?.sameArtist || []) 
-      : activeTab === 'genre' 
-      ? (data?.sameGenre || []) 
-      : (data?.all || []);
+  const currentList = React.useMemo(() => {
+    if (!data) return [];
+    if (activeTab === 'artist') return data.sameArtist || [];
+    if (activeTab === 'genre') return data.sameGenre || [];
+    return data.all || [];
+  }, [data, activeTab]);
 
   const uniqueList = React.useMemo(() => {
     const seen = new Set<string>();
@@ -118,32 +117,22 @@ export const MoreLikeThisModal: React.FC = () => {
     });
   }, [currentList]);
 
+  if (!moreLikeThisOpen || !currentTrack) return null;
+
   const handlePlaySong = (song: Song) => {
-    if (jamSession) {
-      broadcastPlayTrack(song, uniqueList);
-    } else {
-      playTrack(song, uniqueList);
-    }
+    playTrack(song, uniqueList);
   };
 
   const handlePlayAll = () => {
     if (currentList.length > 0) {
-      if (jamSession) {
-        broadcastPlayTrack(currentList[0], currentList);
-      } else {
-        playTrack(currentList[0], currentList);
-      }
+      playTrack(currentList[0], currentList);
       setMoreLikeThisOpen(false);
     }
   };
 
   const handleAddTrack = (e: React.MouseEvent, song: Song) => {
     e.stopPropagation();
-    if (jamSession) {
-      broadcastAddToQueue(song);
-    } else {
-      addToQueue(song);
-    }
+    addToQueue(song);
     setAddedIds(prev => new Set(prev).add(song.id));
     setTimeout(() => {
       setAddedIds(prev => {
@@ -156,11 +145,7 @@ export const MoreLikeThisModal: React.FC = () => {
 
   const handleAddAllToQueue = () => {
     currentList.forEach(song => {
-      if (jamSession) {
-        broadcastAddToQueue(song);
-      } else {
-        addToQueue(song);
-      }
+      addToQueue(song);
     });
     setMoreLikeThisOpen(false);
   };
@@ -179,10 +164,19 @@ export const MoreLikeThisModal: React.FC = () => {
         }}
       >
         {/* Header Bar */}
-        <div className="p-5 sm:p-6 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-indigo-950/40 via-[#0d0f17] to-[#0d0f17]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[var(--aura-primary,#6366f1)]/20 border border-[var(--aura-primary,#6366f1)]/40 flex items-center justify-center text-[var(--aura-primary,#6366f1)]">
-              <Sparkles className="w-5 h-5" />
+        <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-indigo-950/40 via-[#0d0f17] to-[#0d0f17]">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* Back Button */}
+            <button
+              onClick={() => setMoreLikeThisOpen(false)}
+              aria-label="Back"
+              className="p-2 -ml-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              data-tooltip="Go back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--aura-primary,#6366f1)]/20 border border-[var(--aura-primary,#6366f1)]/40 flex items-center justify-center text-[var(--aura-primary,#6366f1)] shrink-0">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -191,7 +185,7 @@ export const MoreLikeThisModal: React.FC = () => {
                   SONIC ECHO
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-400 hidden sm:block">
                 Acoustic recommendations matching the tone & mood of your current track
               </p>
             </div>
@@ -199,7 +193,9 @@ export const MoreLikeThisModal: React.FC = () => {
 
           <button
             onClick={() => setMoreLikeThisOpen(false)}
-            className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Close"
+            className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            data-tooltip="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -364,7 +360,7 @@ export const MoreLikeThisModal: React.FC = () => {
                           ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
                           : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white'
                       }`}
-                      title={jamSession ? "Add to Car Jam Queue" : "Add to Queue"}
+                      title={jamRoom ? "Add to Jam Queue" : "Add to Queue"}
                     >
                       {isAdded ? (
                         <>
@@ -375,7 +371,7 @@ export const MoreLikeThisModal: React.FC = () => {
                         <>
                           <Plus className="w-3 h-3" />
                           <span className="text-[10px] hidden sm:inline">
-                            {jamSession ? 'Jam Queue' : 'Queue'}
+                            {jamRoom ? 'Jam Queue' : 'Queue'}
                           </span>
                         </>
                       )}
@@ -392,10 +388,10 @@ export const MoreLikeThisModal: React.FC = () => {
         </div>
 
         {/* Footer info */}
-        {jamSession && (
+        {jamRoom && (
           <div className="p-3 bg-indigo-950/30 border-t border-white/5 text-center text-xs font-mono text-indigo-300 flex items-center justify-center gap-2">
             <Users className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Active Car Jam Session: Playing or queuing songs updates all connected devices.</span>
+            <span>Active Jam Session ({jamRoom.metadata.name}): Playing or queuing songs updates the room.</span>
           </div>
         )}
       </div>

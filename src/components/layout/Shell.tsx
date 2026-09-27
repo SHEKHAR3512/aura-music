@@ -15,7 +15,8 @@ import {
 import { usePlayerStore } from '../../stores/playerStore';
 import { useLibraryStore } from '../../lib/storage/libraryStore';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
-import { useJamStore } from '../../lib/jam/jamStore';
+import { useJamStore } from '../../features/jam/store/useJamStore';
+import { audioEngine } from '../../lib/audio/AudioEngine';
 
 interface ShellProps {
   currentTab: string;
@@ -24,13 +25,15 @@ interface ShellProps {
 }
 
 export const Shell: React.FC<ShellProps> = ({ currentTab, onTabChange, children }) => {
-  const { session: jamSession } = useJamStore();
+  const { room } = useJamStore();
   const { isOnline, isForcedOffline, toggleForcedOffline } = useNetworkStatus();
   const {
     togglePlay,
     nextTrack,
     prevTrack,
     toggleMute,
+    adjustVolume,
+    seek,
     toggleLike,
     currentTrack,
     setQueueOpen,
@@ -47,7 +50,7 @@ export const Shell: React.FC<ShellProps> = ({ currentTab, onTabChange, children 
 
   const { profile } = useLibraryStore();
 
-  // Desktop Global Keyboard Shortcuts
+  // Desktop & MacBook Native Keyboard Controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Do not trigger if typing in an input or textarea
@@ -56,28 +59,72 @@ export const Shell: React.FC<ShellProps> = ({ currentTab, onTabChange, children 
         return;
       }
 
-      if (e.key === ' ' || e.code === 'Space') {
+      // MacBook / Apple Hardware Play/Pause (Space or MediaPlayPause)
+      if (e.key === ' ' || e.code === 'Space' || e.key === 'MediaPlayPause') {
         e.preventDefault();
         togglePlay();
-      } else if (e.key === 'n' || e.key === 'N') {
+      } 
+      // MacBook / Apple Music Next Track (MediaTrackNext, Cmd+Right, or 'n')
+      else if (e.key === 'MediaTrackNext' || (e.metaKey && e.key === 'ArrowRight') || e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         nextTrack();
-      } else if (e.key === 'p' || e.key === 'P') {
+      } 
+      // MacBook / Apple Music Previous Track (MediaTrackPrevious, Cmd+Left, or 'p')
+      else if (e.key === 'MediaTrackPrevious' || (e.metaKey && e.key === 'ArrowLeft') || e.key === 'p' || e.key === 'P') {
         e.preventDefault();
         prevTrack();
-      } else if (e.key === 'm' || e.key === 'M') {
+      } 
+      // MacBook / Apple Music Volume Up (ArrowUp or Cmd+ArrowUp)
+      else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const step = e.shiftKey ? 0.1 : 0.05;
+        adjustVolume(step);
+      } 
+      // MacBook / Apple Music Volume Down (ArrowDown or Cmd+ArrowDown)
+      else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const step = e.shiftKey ? -0.1 : -0.05;
+        adjustVolume(step);
+      } 
+      // Seek Backward 5s / 10s (ArrowLeft without Cmd)
+      else if (e.key === 'ArrowLeft' && !e.metaKey) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 5;
+        seek(Math.max(0, audioEngine.getCurrentTime() - step));
+      } 
+      // Seek Forward 5s / 10s (ArrowRight without Cmd)
+      else if (e.key === 'ArrowRight' && !e.metaKey) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 5;
+        seek(audioEngine.getCurrentTime() + step);
+      } 
+      // Toggle Mute
+      else if (e.key === 'm' || e.key === 'M') {
         e.preventDefault();
         toggleMute();
-      } else if (e.key === 'l' || e.key === 'L') {
+      } 
+      // Stop
+      else if (e.key === 'MediaStop') {
+        e.preventDefault();
+        togglePlay();
+      } 
+      // Like Current Song
+      else if (e.key === 'l' || e.key === 'L') {
         e.preventDefault();
         if (currentTrack) toggleLike(currentTrack);
-      } else if (e.key === 'q' || e.key === 'Q') {
+      } 
+      // Toggle Queue Drawer
+      else if (e.key === 'q' || e.key === 'Q') {
         e.preventDefault();
         setQueueOpen(!queueOpen);
-      } else if (e.key === '/') {
+      } 
+      // Search
+      else if (e.key === '/') {
         e.preventDefault();
         setSearchModalOpen(true);
-      } else if (e.key === 'Escape') {
+      } 
+      // Escape to close open overlays
+      else if (e.key === 'Escape') {
         if (isExpandedPlayer) toggleExpandedPlayer();
         setSearchModalOpen(false);
         setEqModalOpen(false);
@@ -93,6 +140,8 @@ export const Shell: React.FC<ShellProps> = ({ currentTab, onTabChange, children 
     nextTrack,
     prevTrack,
     toggleMute,
+    adjustVolume,
+    seek,
     toggleLike,
     currentTrack,
     queueOpen,
@@ -155,20 +204,20 @@ export const Shell: React.FC<ShellProps> = ({ currentTab, onTabChange, children 
 
         {/* Zone 3: Primary Actions (Search Trigger, Studio EQ, Profile) */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Car Group Play Trigger */}
+          {/* Aura Jam Listening Room Trigger */}
           <button
             onClick={() => setJamModalOpen(true)}
-            aria-label="Car Group Play"
-            title="Car Group Play / Multi-Device Jam"
+            aria-label="Aura Jam Listening Room"
+            title="Realtime Collaborative Listening Room"
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              jamSession 
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm' 
+              room 
+                ? 'bg-[var(--aura-primary,#6366f1)]/20 text-indigo-300 border border-[var(--aura-primary,#6366f1)]/40 shadow-sm' 
                 : 'bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300'
             }`}
           >
-            <Car className={`w-3.5 h-3.5 ${jamSession ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
+            <Radio className={`w-3.5 h-3.5 ${room ? 'text-[var(--aura-primary,#6366f1)] animate-pulse' : 'text-slate-400'}`} />
             <span className="hidden sm:inline">
-              {jamSession ? `Car Jam (${jamSession.members.length})` : 'Group Play'}
+              {room ? `Jam (${Object.keys(room.participants || {}).length})` : 'Aura Jam'}
             </span>
           </button>
 
@@ -233,13 +282,18 @@ export const Shell: React.FC<ShellProps> = ({ currentTab, onTabChange, children 
         </div>
       )}
 
-      {/* Main Content Area — extra bottom padding on mobile to clear nav + MiniPlayer */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6 pb-44 md:pb-6">
+      {/* Main Content Area — responsive bottom padding clearing mobile nav and miniplayer */}
+      <main className={`flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6 ${
+        currentTrack ? 'pb-44 md:pb-28' : 'pb-24 md:pb-12'
+      }`}>
         {children}
       </main>
 
-      {/* Mobile Fixed Bottom Navigation Tab Bar — sits ABOVE the MiniPlayer */}
-      <div className="md:hidden fixed bottom-[84px] left-0 right-0 z-30 bg-[#0d0f17]/95 backdrop-blur-xl border-t border-white/[0.08] px-4 py-2 flex items-center justify-around shadow-2xl">
+      {/* Mobile Fixed Bottom Navigation Tab Bar — docked cleanly at bottom-0 with pb-safe */}
+      <nav 
+        aria-label="Mobile Navigation"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-30 h-14 bg-[#0d0f17]/95 backdrop-blur-xl border-t border-white/[0.08] px-4 flex items-center justify-around shadow-2xl pb-safe"
+      >
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
@@ -247,16 +301,16 @@ export const Shell: React.FC<ShellProps> = ({ currentTab, onTabChange, children 
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={`flex flex-col items-center justify-center min-w-[48px] min-h-[44px] transition-colors ${
-                isActive ? 'text-[var(--aura-primary,#6366f1)] font-semibold' : 'text-slate-400'
+              className={`flex flex-col items-center justify-center min-w-[48px] h-full transition-colors cursor-pointer ${
+                isActive ? 'text-[var(--aura-primary,#6366f1)] font-semibold' : 'text-slate-400 hover:text-white'
               }`}
             >
               <Icon className="w-5 h-5" />
-              <span className="text-[10px] mt-1">{item.label}</span>
+              <span className="text-[10px] mt-0.5">{item.label}</span>
             </button>
           );
         })}
-      </div>
+      </nav>
 
     </div>
   );

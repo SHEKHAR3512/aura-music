@@ -19,13 +19,13 @@ import {
   Car
 } from 'lucide-react';
 import { usePlayerStore } from '../../stores/playerStore';
-import { useJamStore } from '../../lib/jam/jamStore';
+import { useJamStore } from '../jam/store/useJamStore';
 import { useAudioTime, formatTime } from '../../hooks/useAudioTime';
 import { SafeImage } from '../../components/ui/SafeImage';
 import { triggerHaptic } from '../../lib/utils/haptics';
 
 export const MiniPlayer: React.FC = () => {
-  const { session: jamSession } = useJamStore();
+  const { room: jamRoom } = useJamStore();
   const {
     currentTrack,
     isPlaying,
@@ -128,7 +128,7 @@ export const MiniPlayer: React.FC = () => {
     <footer 
       role="region"
       aria-label="Audio Player"
-      className="fixed bottom-0 left-0 right-0 z-40 bg-[#0d0e15]/95 backdrop-blur-xl border-t border-white/[0.08] select-none transition-all duration-300 pb-safe"
+      className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] md:bottom-0 left-0 right-0 z-40 bg-[#0d0e15]/95 backdrop-blur-xl border-t border-white/[0.08] select-none transition-all duration-300 md:pb-safe"
       style={{
         boxShadow: '0 -10px 40px -10px var(--aura-glow, rgba(0,0,0,0.5))',
       }}
@@ -171,15 +171,15 @@ export const MiniPlayer: React.FC = () => {
       </div>
 
       <div 
-        className="max-w-7xl mx-auto px-3 sm:px-6 h-[72px] flex items-center justify-between gap-3 sm:gap-6 transition-transform duration-150"
+        className="max-w-7xl mx-auto px-3 sm:px-6 h-[72px] flex items-center justify-between gap-2 sm:gap-6 transition-transform duration-150"
         style={{ transform: swipeOffset ? `translateX(${swipeOffset}px)` : undefined, opacity: swipeOffset ? 0.7 : 1 }}
       >
         
         {/* Track Info (Zone 1) */}
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0 max-w-[35%] sm:max-w-[30%]">
+        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0 flex-1 sm:flex-initial sm:max-w-[30%]">
           <div 
             onClick={toggleExpandedPlayer}
-            className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 cursor-pointer shadow-md group border border-white/10"
+            className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-lg overflow-hidden shrink-0 cursor-pointer shadow-md group border border-white/10"
           >
             <SafeImage 
               src={currentTrack.artwork.low || currentTrack.artwork.medium} 
@@ -192,19 +192,19 @@ export const MiniPlayer: React.FC = () => {
             </div>
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1" onClick={toggleExpandedPlayer}>
             <h4 
-              onClick={toggleExpandedPlayer}
-              className="text-sm font-semibold text-white truncate cursor-pointer hover:underline"
+              className="text-xs sm:text-sm font-semibold text-white truncate cursor-pointer hover:underline"
               title={currentTrack.title}
             >
               {currentTrack.title}
             </h4>
-            <p className="text-xs text-slate-400 truncate mt-0.5" title={currentTrack.primaryArtist}>
+            <p className="text-[11px] sm:text-xs text-slate-400 truncate mt-0.5" title={currentTrack.primaryArtist}>
               {currentTrack.primaryArtist}
             </p>
           </div>
 
+          {/* Desktop Like Button */}
           <button
             onClick={() => toggleLike(currentTrack)}
             aria-label={isLiked ? "Unlike song" : "Like song"}
@@ -217,8 +217,8 @@ export const MiniPlayer: React.FC = () => {
         </div>
 
         {/* Central Playback Controls (Zone 2) */}
-        <div className="flex flex-col items-center justify-center gap-1">
-          <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex flex-col items-center justify-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-4">
             <button
               onClick={toggleShuffle}
               aria-label="Shuffle"
@@ -232,32 +232,32 @@ export const MiniPlayer: React.FC = () => {
             <button
               onClick={prevTrack}
               aria-label="Previous track"
-              className="p-2 rounded-full text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 sm:p-2 rounded-full text-slate-300 hover:text-white transition-colors"
             >
-              <SkipBack className="w-5 h-5 fill-current" />
+              <SkipBack className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
             </button>
 
             <button
               onClick={togglePlay}
               aria-label={isPlaying ? "Pause" : "Play"}
               disabled={isLoading}
-              className="w-11 h-11 rounded-full bg-white text-slate-950 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-lg cursor-pointer"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white text-slate-950 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-lg cursor-pointer"
             >
               {isLoading ? (
-                <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
               ) : isPlaying ? (
-                <Pause className="w-5 h-5 fill-current" />
+                <Pause className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
               ) : (
-                <Play className="w-5 h-5 fill-current translate-x-0.5" />
+                <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current translate-x-0.5" />
               )}
             </button>
 
             <button
               onClick={nextTrack}
               aria-label="Next track"
-              className="p-2 rounded-full text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 sm:p-2 rounded-full text-slate-300 hover:text-white transition-colors"
             >
-              <SkipForward className="w-5 h-5 fill-current" />
+              <SkipForward className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
             </button>
 
             <button
@@ -280,53 +280,53 @@ export const MiniPlayer: React.FC = () => {
         </div>
 
         {/* Studio Tools & Audio Volume (Zone 3) */}
-        <div className="flex items-center gap-1 sm:gap-2 justify-end min-w-0">
+        <div className="flex items-center gap-1 sm:gap-2 justify-end shrink-0">
           
-          {/* More Like This (Related / Same Genre) Trigger */}
+          {/* Car Group Play / Jam Trigger: Visible on mobile IF jam is active, otherwise hidden on mobile */}
+          <button
+            onClick={() => setJamModalOpen(true)}
+            aria-label="Car Group Play"
+            title="Car Group Play / Multi-Device Jam"
+            className={`p-2 rounded-lg transition-colors relative ${
+              jamRoom ? 'text-emerald-400 bg-emerald-500/10 flex' : 'text-slate-400 hover:text-white hidden sm:flex'
+            }`}
+          >
+            <Car className="w-4 h-4" />
+            {jamRoom && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            )}
+          </button>
+
+          {/* More Like This (Gemini Sparkles Icon): Hidden on mobile to prevent overlapping player */}
           <button
             onClick={() => setMoreLikeThisOpen(!moreLikeThisOpen)}
             aria-label="More Like This"
             title="More Like This (Related Songs & Same Genre)"
-            className={`p-2 rounded-lg transition-colors ${
+            className={`p-2 rounded-lg transition-colors hidden md:flex ${
               moreLikeThisOpen ? 'text-[var(--aura-primary,#6366f1)] bg-white/10' : 'text-slate-400 hover:text-white'
             }`}
           >
             <Sparkles className="w-4 h-4" />
           </button>
 
-          {/* Car Group Play / Jam Trigger */}
-          <button
-            onClick={() => setJamModalOpen(true)}
-            aria-label="Car Group Play"
-            title="Car Group Play / Multi-Device Jam"
-            className={`p-2 rounded-lg transition-colors relative ${
-              jamSession ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Car className="w-4 h-4" />
-            {jamSession && (
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            )}
-          </button>
-
-          {/* Studio EQ Trigger */}
+          {/* Studio EQ Trigger (Desktop/Tablet only) */}
           <button
             onClick={() => setEqModalOpen(!eqModalOpen)}
             aria-label="Studio Equalizer"
             title="Studio Equalizer (10-Band EQ)"
-            className={`p-2 rounded-lg transition-colors ${
+            className={`p-2 rounded-lg transition-colors hidden lg:flex ${
               eqModalOpen ? 'text-white bg-white/10' : 'text-slate-400 hover:text-white'
             }`}
           >
             <SlidersHorizontal className="w-4 h-4" />
           </button>
 
-          {/* Canvas Visualizer Trigger */}
+          {/* Canvas Visualizer Trigger (Desktop/Tablet only) */}
           <button
             onClick={toggleVisualizer}
             aria-label="Cinematic Visualizer"
             title="Cinematic Visualizer"
-            className={`p-2 rounded-lg transition-colors ${
+            className={`p-2 rounded-lg transition-colors hidden lg:flex ${
               visualizerActive ? 'text-[var(--aura-primary,#6366f1)] bg-white/10' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -338,7 +338,7 @@ export const MiniPlayer: React.FC = () => {
             onClick={() => setLyricsOpen(!lyricsOpen)}
             aria-label="Synced Lyrics"
             title="Synced Lyrics"
-            className={`p-2 rounded-lg transition-colors ${
+            className={`p-2 rounded-lg transition-colors hidden sm:flex ${
               lyricsOpen ? 'text-[var(--aura-primary,#6366f1)] bg-white/10' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -350,11 +350,22 @@ export const MiniPlayer: React.FC = () => {
             onClick={() => setQueueOpen(!queueOpen)}
             aria-label="Up Next Queue"
             title="Queue"
-            className={`p-2 rounded-lg transition-colors ${
+            className={`p-2 rounded-lg transition-colors hidden sm:flex ${
               queueOpen ? 'text-[var(--aura-primary,#6366f1)] bg-white/10' : 'text-slate-400 hover:text-white'
             }`}
           >
             <ListMusic className="w-4 h-4" />
+          </button>
+
+          {/* Mobile Heart Like Button (Visible on mobile phone view) */}
+          <button
+            onClick={() => toggleLike(currentTrack)}
+            aria-label={isLiked ? "Unlike song" : "Like song"}
+            className={`p-2 rounded-full transition-colors flex sm:hidden shrink-0 ${
+              isLiked ? 'text-rose-500 hover:text-rose-400' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
           </button>
 
           {/* Volume Slider (Desktop) */}

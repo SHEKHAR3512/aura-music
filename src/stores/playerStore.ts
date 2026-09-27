@@ -4,6 +4,8 @@ import { audioEngine, EQ_PRESETS } from '../lib/audio/AudioEngine';
 import { extractDominantColors, applyDynamicThemeVariables, DEFAULT_COLORS, ExtractedColors } from '../lib/color/colorExtractor';
 import { CURATED_FEATURED_SONGS } from '../lib/music/cache';
 import { triggerHaptic } from '../lib/utils/haptics';
+import { useJamStore } from '../features/jam/store/useJamStore';
+import { mediaSessionService } from '../lib/media/MediaSessionService';
 
 interface PlayerState {
   // Current playback state
@@ -61,6 +63,7 @@ interface PlayerState {
   toggleShuffle: () => void;
   cycleRepeat: () => void;
   setVolume: (vol: number) => void;
+  adjustVolume: (delta: number) => void;
   toggleMute: () => void;
   setPlaybackRate: (rate: number) => void;
   setEQBand: (index: number, gain: number) => void;
@@ -83,21 +86,6 @@ interface PlayerState {
   setSmartQueue: (enabled: boolean) => void;
 }
 
-// Media Session helper
-function updateMediaSession(song: Song) {
-  if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
-  navigator.mediaSession.metadata = new MediaMetadata({
-    title: song.title,
-    artist: song.primaryArtist,
-    album: song.album.title,
-    artwork: [
-      { src: song.artwork.low, sizes: '96x96', type: 'image/jpeg' },
-      { src: song.artwork.medium, sizes: '256x256', type: 'image/jpeg' },
-      { src: song.artwork.high, sizes: '512x512', type: 'image/jpeg' },
-    ],
-  });
-}
-
 // Local storage helpers
 const LIKES_KEY = 'aura_liked_songs';
 function getInitialLikes(): string[] {
@@ -113,9 +101,10 @@ function getInitialLikes(): string[] {
 let sleepTimerInterval: any = null;
 
 export const usePlayerStore = create<PlayerState>((set, get) => {
-  // Listen for audio engine state updates
+  // Listen for audio engine state updates & sync with macOS MediaSession
   audioEngine.subscribeState((isPlaying, isLoading) => {
     set({ isPlaying, isLoading });
+    mediaSessionService.updatePlaybackState(isPlaying);
   });
 
   // Track ended handler
@@ -129,15 +118,48 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     }
   });
 
-  // Setup media session action handlers
-  if (typeof window !== 'undefined' && 'mediaSession' in navigator) {
-    navigator.mediaSession.setActionHandler('play', () => audioEngine.play());
-    navigator.mediaSession.setActionHandler('pause', () => audioEngine.pause());
-    navigator.mediaSession.setActionHandler('previoustrack', () => get().prevTrack());
-    navigator.mediaSession.setActionHandler('nexttrack', () => get().nextTrack());
-    navigator.mediaSession.setActionHandler('seekto', (details) => {
-      if (details.seekTime !== undefined) audioEngine.seek(details.seekTime);
-    });
+  // Timeline position sync for macOS Touch Bar / Control Center scrub bar
+  audioEngine.subscribeTime((current, duration) => {
+    mediaSessionService.updatePositionState(current, duration, get().playbackRate);
+  });
+
+  // Hardware / System volume synchronization
+  audioEngine.subscribeVolume((volume, isMuted) => {
+    set({ volume, isMuted });
+  });
+
+  // Initialize MediaSession with all action handlers for Apple keyboard, Touch Bar, and AirPods
+  mediaSessionService.init({
+    onPlay: () => {
+      const state = get();
+      if (!state.isPlaying) state.togglePlay();
+    },
+    onPause: () => {
+      const state = get();
+      if (state.isPlaying) state.togglePlay();
+    },
+    onPreviousTrack: () => get().prevTrack(),
+    onNextTrack: () => get().nextTrack(),
+    onSeekTo: (time) => get().seek(time),
+    onSeekBackward: (offset) => {
+      const current = audioEngine.getCurrentTime();
+      get().seek(Math.max(0, current - offset));
+    },
+    onSeekForward: (offset) => {
+      const current = audioEngine.getCurrentTime();
+      get().seek(current + offset);
+    },
+    onStop: () => {
+      const state = get();
+      if (state.isPlaying) state.togglePlay();
+    },
+  });
+
+  // Register initial song immediately so macOS recognizes Aura on page load
+  const initialTrack = CURATED_FEATURED_SONGS[0];
+  if (initialTrack) {
+    mediaSessionService.updateMetadata(initialTrack);
+    mediaSessionService.updatePlaybackState(false);
   }
 
   return {
@@ -180,6 +202,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     playTrack: async (song: Song, newQueue?: Song[]) => {
       const state = get();
 
+      // If connected to an active Jam room, route track playback to the Jam session
+      const jamState = useJamStore.getState();
+      if (jamState.room) {
+        await jamState.playTrack(song);
+        return;
+      }
+
       // If audioUrl is missing or incomplete, resolve song details
       let activeSong = song;
       if (!activeSong.audioUrl || !activeSong.audioUrl.startsWith('http')) {
@@ -219,7 +248,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         isLoading: true,
       });
 
-      updateMediaSession(activeSong);
+      mediaSessionService.updateMetadata(activeSong);
+      mediaSessionService.updatePlaybackState(true);
 
       // Trigger tactile haptic on play
       triggerHaptic('play');
@@ -236,6 +266,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     togglePlay: () => {
+      const jamState = useJamStore.getState();
+      if (jamState.room) {
+        if (jamState.room.playback.isPlaying) {
+          jamState.pause();
+        } else {
+          jamState.play();
+        }
+        return;
+      }
+
       const state = get();
       if (!state.currentTrack) {
         if (state.queue.length > 0) {
@@ -255,6 +295,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     nextTrack: () => {
+      const jamState = useJamStore.getState();
+      if (jamState.room) {
+        jamState.next();
+        return;
+      }
+
       const { queue, queueIndex, shuffle, repeat, smartQueueEnabled } = get();
       if (queue.length === 0) return;
 
@@ -294,6 +340,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         return;
       }
 
+      const jamState = useJamStore.getState();
+      if (jamState.room) {
+        jamState.previous();
+        return;
+      }
+
       const { queue, queueIndex, history } = get();
       if (history.length > 0) {
         const prev = history[0];
@@ -310,11 +362,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     seek: (seconds: number) => {
+      const jamState = useJamStore.getState();
+      if (jamState.room) {
+        jamState.seek(seconds);
+        return;
+      }
       triggerHaptic('seek');
       audioEngine.seek(seconds);
     },
 
     addToQueue: (song: Song) => {
+      const jamState = useJamStore.getState();
+      if (jamState.room) {
+        jamState.addToQueue(song);
+        return;
+      }
       triggerHaptic('queue');
       set(state => ({
         queue: [...state.queue, song],
@@ -388,8 +450,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     setVolume: (vol: number) => {
-      audioEngine.setVolume(vol);
-      set({ volume: vol, isMuted: vol === 0 });
+      const clamped = Math.max(0, Math.min(1, Math.round(vol * 100) / 100));
+      audioEngine.setVolume(clamped);
+      set({ volume: clamped, isMuted: clamped === 0 });
+    },
+
+    adjustVolume: (delta: number) => {
+      const { volume } = get();
+      const next = Math.max(0, Math.min(1, Math.round((volume + delta) * 100) / 100));
+      get().setVolume(next);
     },
 
     toggleMute: () => {

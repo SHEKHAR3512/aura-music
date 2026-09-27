@@ -1,6 +1,7 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { IncomingMessage, Server } from 'http';
 import { Song } from '../lib/music/types';
+import { JamRoomState } from '../features/jam/types/jam.types';
 
 export interface JamMember {
   id: string; // deviceId
@@ -42,15 +43,20 @@ export interface JamSession {
 export interface ClientSocket extends WebSocket {
   deviceId?: string;
   sessionId?: string;
+  roomId?: string;
   isAlive?: boolean;
 }
 
 class JamSessionManager {
   private sessions = new Map<string, JamSession>();
   private sockets = new Map<string, Set<ClientSocket>>(); // sessionId -> Set of sockets
+  private roomSockets = new Map<string, Set<ClientSocket>>(); // roomId -> Set of sockets
+  private nextGenRooms = new Map<string, JamRoomState>();
   private wss: WebSocketServer | null = null;
 
+
   public init(server: Server) {
+    this.seedDefaultRooms();
     this.wss = new WebSocketServer({ server, path: '/ws/jam' });
 
     this.wss.on('connection', (ws: ClientSocket, req: IncomingMessage) => {
@@ -344,7 +350,169 @@ class JamSessionManager {
         }
         break;
       }
+
+      // Next-Gen Jam Listening Room Messages
+      case 'jam:room_subscribe': {
+        const roomId = data?.roomId?.toUpperCase();
+        if (roomId) {
+          ws.roomId = roomId;
+          this.addSocketToRoom(roomId, ws);
+          const roomState = this.nextGenRooms.get(roomId);
+          if (roomState) {
+            this.sendToSocket(ws, 'jam:room_state', { state: roomState });
+          }
+        }
+        break;
+      }
+
+      case 'jam:playback_update': {
+        const { roomId, playback, sequenceNumber } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && playback) {
+          room.playback = { ...room.playback, ...playback, updatedAt: Date.now() };
+          room.sequenceNumber = sequenceNumber || (room.sequenceNumber + 1);
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:queue_add': {
+        const { roomId, item, queue } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room) {
+          room.queue = queue || [...room.queue, item];
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:queue_set': {
+        const { roomId, queue } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && queue) {
+          room.queue = queue;
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:reaction': {
+        const { roomId, reaction } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && reaction) {
+          room.reactions = [...room.reactions.slice(-30), reaction];
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:activity': {
+        const { roomId, event } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && event) {
+          room.activity = [event, ...room.activity.slice(0, 49)];
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:settings_update': {
+        const { roomId, settings } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && settings) {
+          room.settings = { ...room.settings, ...settings };
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:vote_skip': {
+        const { roomId, votes } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room) {
+          room.skipVotes = votes || [];
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:heartbeat': {
+        const { roomId, participant } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && participant) {
+          room.participants[participant.id] = {
+            ...room.participants[participant.id],
+            ...participant,
+            lastSeen: Date.now(),
+            isOnline: true,
+          };
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:transfer_host': {
+        const { roomId, newHostId } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room && newHostId) {
+          room.metadata.hostId = newHostId;
+          if (room.participants[newHostId]) {
+            room.participants[newHostId].role = 'host';
+          }
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:end_room': {
+        const { roomId } = data || {};
+        const room = this.nextGenRooms.get(roomId?.toUpperCase());
+        if (room) {
+          room.metadata.active = false;
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
     }
+  }
+
+  public setRoomState(roomId: string, state: JamRoomState) {
+    this.nextGenRooms.set(roomId.toUpperCase(), state);
+    this.broadcastToRoom(roomId, 'jam:room_state', { state });
+  }
+
+  public getRoomState(roomId: string): JamRoomState | undefined {
+    return this.nextGenRooms.get(roomId.toUpperCase());
+  }
+
+  private addSocketToRoom(roomId: string, ws: ClientSocket) {
+    const key = roomId.toUpperCase();
+    if (!this.roomSockets.has(key)) {
+      this.roomSockets.set(key, new Set());
+    }
+    this.roomSockets.get(key)!.add(ws);
+  }
+
+  public broadcastToRoom(roomId: string, type: string, payload: any) {
+    const key = roomId.toUpperCase();
+    const socketSet = this.roomSockets.get(key);
+    if (!socketSet) return;
+    const msg = JSON.stringify({ type, data: payload });
+    socketSet.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(msg);
+      }
+    });
   }
 
   public createSession(
@@ -444,6 +612,16 @@ class JamSessionManager {
       }
       this.leaveSession(ws.sessionId, ws.deviceId);
     }
+
+    if (ws.roomId) {
+      const rSockets = this.roomSockets.get(ws.roomId.toUpperCase());
+      if (rSockets) {
+        rSockets.delete(ws);
+        if (rSockets.size === 0) {
+          this.roomSockets.delete(ws.roomId.toUpperCase());
+        }
+      }
+    }
   }
 
   private addSocketToSession(sessionId: string, ws: ClientSocket) {
@@ -522,6 +700,174 @@ class JamSessionManager {
     }
     const finalCode = `JAM-${code}`;
     return this.sessions.has(finalCode) ? this.generateSessionCode() : finalCode;
+  }
+
+  private seedDefaultRooms() {
+    const now = Date.now();
+    const chillRoom: JamRoomState = {
+      metadata: {
+        id: 'CHILL1',
+        name: 'Lofi & Ambient Sanctuary',
+        hostId: 'aura-curator-chill',
+        createdAt: now,
+        expiresAt: now + 30 * 86400 * 1000,
+        privacy: 'public_link',
+        mode: 'chill',
+        inviteToken: 'CHILL1-INVITE',
+        active: true,
+      },
+      playback: {
+        trackId: 'curated-kesariya',
+        track: {
+          id: 'curated-kesariya',
+          title: 'Kesariya',
+          artists: [{ id: 'pritam', name: 'Pritam' }, { id: 'arijit-singh', name: 'Arijit Singh' }],
+          primaryArtist: 'Arijit Singh',
+          album: { id: 'brahmastra', title: 'Brahmastra', artwork: 'https://c.saavncdn.com/054/Pritam-All-Time-Hits-Hindi-2023-20230529184043-500x500.jpg' },
+          artwork: {
+            low: 'https://c.saavncdn.com/054/Pritam-All-Time-Hits-Hindi-2023-20230529184043-150x150.jpg',
+            medium: 'https://c.saavncdn.com/054/Pritam-All-Time-Hits-Hindi-2023-20230529184043-500x500.jpg',
+            high: 'https://c.saavncdn.com/054/Pritam-All-Time-Hits-Hindi-2023-20230529184043-500x500.jpg'
+          },
+          duration: 268,
+          audioUrl: 'https://aac.saavncdn.com/054/4183c8b4a67c70231da0d90701ca39f5_320.mp4',
+          language: 'Hindi',
+          year: '2022',
+          explicit: false,
+          hasLyrics: true,
+          source: 'curated',
+          sourceId: 'curated-kesariya',
+        },
+        isPlaying: true,
+        position: 12,
+        playbackStartedAt: now - 12000,
+        playbackVersion: 1,
+        updatedAt: now,
+        updatedBy: 'aura-curator-chill',
+      },
+      queue: [],
+      participants: {
+        'aura-curator-chill': {
+          id: 'aura-curator-chill',
+          displayName: 'Aura Chill Curator',
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+          role: 'host',
+          isOnline: true,
+          joinedAt: now,
+          lastSeen: now,
+        },
+      },
+      settings: {
+        allowGuestQueue: true,
+        allowGuestReorder: true,
+        allowGuestSkip: true,
+        allowGuestPause: true,
+        allowGuestSeek: true,
+        allowGuestVolume: true,
+        allowReactions: true,
+        allowRecommendations: true,
+        voteSkipThresholdPercent: 50,
+      },
+      reactions: [],
+      activity: [
+        {
+          id: 'chill-init',
+          type: 'USER_JOIN',
+          actorId: 'aura-curator-chill',
+          actorName: 'Aura Chill Curator',
+          timestamp: now,
+          message: 'Lofi & Ambient Sanctuary session started',
+        },
+      ],
+      songRequests: [],
+      skipVotes: [],
+      sequenceNumber: 1,
+      serverTimestamp: now,
+    };
+
+    const hitRoom: JamRoomState = {
+      metadata: {
+        id: 'HIT88',
+        name: 'Global Chart Toppers',
+        hostId: 'aura-curator-hits',
+        createdAt: now,
+        expiresAt: now + 30 * 86400 * 1000,
+        privacy: 'public_link',
+        mode: 'party',
+        inviteToken: 'HIT88-INVITE',
+        active: true,
+      },
+      playback: {
+        trackId: 'curated-starboy',
+        track: {
+          id: 'curated-starboy',
+          title: 'Starboy',
+          artists: [{ id: 'the-weeknd', name: 'The Weeknd' }, { id: 'daft-punk', name: 'Daft Punk' }],
+          primaryArtist: 'The Weeknd',
+          album: { id: 'starboy-album', title: 'Starboy', artwork: 'https://c.saavncdn.com/372/Starboy-English-2016-500x500.jpg' },
+          artwork: {
+            low: 'https://c.saavncdn.com/372/Starboy-English-2016-150x150.jpg',
+            medium: 'https://c.saavncdn.com/372/Starboy-English-2016-500x500.jpg',
+            high: 'https://c.saavncdn.com/372/Starboy-English-2016-500x500.jpg'
+          },
+          duration: 230,
+          audioUrl: 'https://aac.saavncdn.com/372/2d22028e95d06cf831e083eb6fb2fe9c_320.mp4',
+          language: 'English',
+          year: '2016',
+          explicit: true,
+          hasLyrics: true,
+          source: 'curated',
+          sourceId: 'curated-starboy',
+        },
+        isPlaying: true,
+        position: 25,
+        playbackStartedAt: now - 25000,
+        playbackVersion: 1,
+        updatedAt: now,
+        updatedBy: 'aura-curator-hits',
+      },
+      queue: [],
+      participants: {
+        'aura-curator-hits': {
+          id: 'aura-curator-hits',
+          displayName: 'DJ Aura Hits',
+          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+          role: 'host',
+          isOnline: true,
+          joinedAt: now,
+          lastSeen: now,
+        },
+      },
+      settings: {
+        allowGuestQueue: true,
+        allowGuestReorder: true,
+        allowGuestSkip: true,
+        allowGuestPause: true,
+        allowGuestSeek: true,
+        allowGuestVolume: true,
+        allowReactions: true,
+        allowRecommendations: true,
+        voteSkipThresholdPercent: 50,
+      },
+      reactions: [],
+      activity: [
+        {
+          id: 'hit-init',
+          type: 'USER_JOIN',
+          actorId: 'aura-curator-hits',
+          actorName: 'DJ Aura Hits',
+          timestamp: now,
+          message: 'Global Chart Toppers party started',
+        },
+      ],
+      songRequests: [],
+      skipVotes: [],
+      sequenceNumber: 1,
+      serverTimestamp: now,
+    };
+
+    this.nextGenRooms.set('CHILL1', chillRoom);
+    this.nextGenRooms.set('HIT88', hitRoom);
   }
 }
 

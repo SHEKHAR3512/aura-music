@@ -17,6 +17,8 @@ import { QueueDrawer } from './features/queue/QueueDrawer';
 import { SearchModal } from './features/search/SearchModal';
 import { AuthModal } from './features/auth/AuthModal';
 import { OfflineToast } from './components/ui/OfflineToast';
+import { GlobalTooltipProvider } from './components/ui/Tooltip';
+import { VolumeHUD } from './components/ui/VolumeHUD';
 import { MoreLikeThisModal } from './features/recommendations/MoreLikeThisModal';
 import { GroupPlayModal } from './features/jam/GroupPlayModal';
 import { useJamPlayerSync } from './lib/jam/useJamPlayerSync';
@@ -207,13 +209,6 @@ export function App() {
       {/* Slide-in Queue Drawer */}
       <QueueDrawer />
 
-      {/* Instant Search Overlay */}
-      <SearchModal
-        onSelectArtist={handleSelectArtist}
-        onSelectAlbum={handleSelectAlbum}
-        onSelectPlaylist={handleSelectPlaylist}
-      />
-
       {/* Persistent Offline Mode Toast Notification */}
       <OfflineToast
         onOpenOfflineLibrary={() => {
@@ -230,6 +225,18 @@ export function App() {
 
       {/* Car Group Play / Multi-Device Jam Session Modal */}
       <GroupPlayModal />
+
+      {/* Instant Search Overlay (Mounted last with z-[80] so it opens above Jam room and player) */}
+      <SearchModal
+        onSelectArtist={handleSelectArtist}
+        onSelectAlbum={handleSelectAlbum}
+        onSelectPlaylist={handleSelectPlaylist}
+      />
+      {/* Universal Aura Cinematic Tooltip Provider */}
+      <GlobalTooltipProvider />
+
+      {/* MacBook & Hardware Volume HUD Indicator */}
+      <VolumeHUD />
     </PersistQueryClientProvider>
   );
 }

@@ -17,6 +17,7 @@ export const EQ_PRESETS: Record<EQPresetName, number[]> = {
 type TimeUpdateListener = (time: number, duration: number, buffered: number) => void;
 type StateChangeListener = (isPlaying: boolean, isLoading: boolean) => void;
 type TrackEndListener = () => void;
+type VolumeChangeListener = (volume: number, isMuted: boolean) => void;
 
 class AudioEngine {
   private audio: HTMLAudioElement;
@@ -36,6 +37,7 @@ class AudioEngine {
   private timeListeners = new Set<TimeUpdateListener>();
   private stateListeners = new Set<StateChangeListener>();
   private endListeners = new Set<TrackEndListener>();
+  private volumeListeners = new Set<VolumeChangeListener>();
 
   // Frequency analysis buffers
   private frequencyData: Uint8Array = new Uint8Array(256);
@@ -47,11 +49,26 @@ class AudioEngine {
   private crossfadeDuration = 2; // seconds
 
   constructor() {
-    this.audio = new Audio();
-    this.audio.preload = 'auto';
-    this.audio.crossOrigin = 'anonymous';
-
-    this.setupAudioListeners();
+    if (typeof window !== 'undefined' && typeof Audio !== 'undefined') {
+      this.audio = new Audio();
+      this.audio.preload = 'auto';
+      this.audio.crossOrigin = 'anonymous';
+      this.setupAudioListeners();
+    } else {
+      this.audio = {
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        play: () => Promise.resolve(),
+        pause: () => {},
+        load: () => {},
+        currentTime: 0,
+        duration: 0,
+        volume: 1,
+        playbackRate: 1,
+        paused: true,
+        buffered: { length: 0, end: () => 0 },
+      } as any;
+    }
   }
 
   private setupAudioListeners() {
@@ -88,6 +105,12 @@ class AudioEngine {
     this.audio.addEventListener('error', (err) => {
       console.warn('Audio playback error encountered:', err);
       this.stateListeners.forEach(l => l(false, false));
+    });
+
+    this.audio.addEventListener('volumechange', () => {
+      const vol = this.audio.volume;
+      const muted = this.audio.muted || vol === 0;
+      this.volumeListeners.forEach(l => l(vol, muted));
     });
   }
 
@@ -243,9 +266,15 @@ class AudioEngine {
   public setVolume(vol: number) {
     const clamped = Math.max(0, Math.min(1, vol));
     this.audio.volume = clamped;
-    if (this.masterGain && this.audioCtx) {
-      this.masterGain.gain.setValueAtTime(clamped, this.audioCtx.currentTime);
-    }
+    this.audio.muted = clamped === 0;
+  }
+
+  public getVolume(): number {
+    return this.audio.volume;
+  }
+
+  public isMuted(): boolean {
+    return this.audio.muted || this.audio.volume === 0;
   }
 
   public setPlaybackRate(rate: number) {
@@ -386,6 +415,12 @@ class AudioEngine {
   public subscribeEnded(listener: TrackEndListener): () => void {
     this.endListeners.add(listener);
     return () => this.endListeners.delete(listener);
+  }
+
+  // Subscribe to volume and mute changes from hardware/OS
+  public subscribeVolume(listener: VolumeChangeListener): () => void {
+    this.volumeListeners.add(listener);
+    return () => this.volumeListeners.delete(listener);
   }
 
   public getCurrentTime(): number {
