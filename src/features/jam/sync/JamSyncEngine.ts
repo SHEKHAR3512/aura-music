@@ -28,6 +28,36 @@ class JamSyncEngine {
   private stateListeners = new Set<SyncStateCallback>();
   private activeRoomId: string | null = null;
   private isLocallyPausedByDrift = false;
+  private isAudioOutputEnabled: boolean = true;
+
+  /**
+   * Toggles or sets whether this local device outputs audio through its speakers/hardware.
+   * When false (Remote Controller mode), the device synchronizes UI/state but stays silent,
+   * avoiding double playback when joined alongside a host speaker.
+   */
+  public setAudioOutputEnabled(enabled: boolean) {
+    this.isAudioOutputEnabled = enabled;
+    if (!enabled) {
+      audioEngine.pause();
+    } else {
+      // If enabling audio output and there is an active playing track, start playing in sync
+      if (this.currentPlaybackState?.isPlaying && this.currentTrack?.audioUrl) {
+        const expectedPos = this.getExpectedPosition();
+        audioEngine
+          .loadAndPlay(this.currentTrack.audioUrl, false)
+          .then(() => {
+            audioEngine.seek(expectedPos);
+          })
+          .catch((err) => {
+            console.warn('JamSyncEngine: failed to resume audio output on enable:', err);
+          });
+      }
+    }
+  }
+
+  public getIsAudioOutputEnabled(): boolean {
+    return this.isAudioOutputEnabled;
+  }
 
   /**
    * Initializes or updates playback synchronization for an active room.
@@ -42,6 +72,7 @@ class JamSyncEngine {
     this.stopSyncLoop();
     this.currentPlaybackState = null;
     this.currentTrack = null;
+    this.isAudioOutputEnabled = true;
     driftCorrection.reset();
   }
 
@@ -95,8 +126,18 @@ class JamSyncEngine {
         targetSong = await songResolver(newState.trackId);
       }
 
-      if (targetSong && targetSong.audioUrl) {
+      if (targetSong) {
         this.currentTrack = targetSong;
+      }
+
+      // If this device is in Remote Controller Mode (audio output disabled), do not load/play audio
+      if (!this.isAudioOutputEnabled) {
+        audioEngine.pause();
+        this.isProcessingEvent = false;
+        return;
+      }
+
+      if (targetSong && targetSong.audioUrl) {
         const expectedPos = this.calculateExpectedPosition(newState);
 
         try {
@@ -115,7 +156,13 @@ class JamSyncEngine {
       return;
     }
 
-    // 3. Handle Play / Pause / Seek on the same track
+    // In Remote Controller Mode, ensure local audio element is paused
+    if (!this.isAudioOutputEnabled) {
+      audioEngine.pause();
+      return;
+    }
+
+    // 3. Handle Play / Pause / Seek on the same track (Speaker Mode)
     const expectedPos = this.calculateExpectedPosition(newState);
     const currentAudioTime = audioEngine.getCurrentTime();
 
@@ -161,6 +208,21 @@ class JamSyncEngine {
     if (!this.currentPlaybackState || this.isProcessingEvent) return;
 
     const expectedPosition = this.calculateExpectedPosition(this.currentPlaybackState);
+
+    // If local audio output is off (Remote Controller Mode), stay in sync without inspecting local audioEngine
+    if (!this.isAudioOutputEnabled) {
+      this.stateListeners.forEach((listener) => {
+        listener({
+          connectionState: 'synced',
+          expectedPosition,
+          actualPosition: expectedPosition,
+          driftMs: 0,
+          isSynced: true,
+        });
+      });
+      return;
+    }
+
     const actualPosition = audioEngine.getCurrentTime();
     const isPlaying = this.currentPlaybackState.isPlaying && !audioEngine.isPaused();
 

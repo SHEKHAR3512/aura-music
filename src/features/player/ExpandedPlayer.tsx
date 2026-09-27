@@ -19,7 +19,7 @@ import {
   Car
 } from 'lucide-react';
 import { usePlayerStore } from '../../stores/playerStore';
-import { useJamStore } from '../../lib/jam/jamStore';
+import { useJamStore } from '../jam/store/useJamStore';
 import { useAudioTime, formatTime } from '../../hooks/useAudioTime';
 import { SyncedLyricsView } from '../lyrics/SyncedLyricsView';
 import { VisualizerCanvas } from '../visualizer/VisualizerCanvas';
@@ -51,7 +51,7 @@ export const ExpandedPlayer: React.FC = () => {
     setPlaybackRate,
   } = usePlayerStore();
 
-  const { session: jamSession } = useJamStore();
+  const { room: jamRoom } = useJamStore();
 
   const { currentTime, duration, progress } = useAudioTime();
   const [activeTab, setActiveTab] = useState<'artwork' | 'lyrics' | 'visualizer'>('artwork');
@@ -85,20 +85,20 @@ export const ExpandedPlayer: React.FC = () => {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-2xl pointer-events-none" />
 
       {/* Top Header Bar */}
-      <div className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-white/10">
+      <div className="relative z-10 flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b border-white/10 gap-2">
         <button
           onClick={toggleExpandedPlayer}
           aria-label="Collapse player"
-          className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+          className="p-1.5 sm:p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors shrink-0"
         >
-          <ChevronDown className="w-6 h-6" />
+          <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
 
         {/* Center Mode Switcher Tabs */}
-        <div className="flex items-center gap-1 p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10">
+        <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10">
           <button
             onClick={() => setActiveTab('artwork')}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+            className={`px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-all ${
               activeTab === 'artwork' ? 'bg-white text-slate-950 shadow-md' : 'text-slate-300 hover:text-white'
             }`}
           >
@@ -106,31 +106,31 @@ export const ExpandedPlayer: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('lyrics')}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-all ${
               activeTab === 'lyrics' ? 'bg-white text-slate-950 shadow-md' : 'text-slate-300 hover:text-white'
             }`}
           >
-            <Mic2 className="w-3.5 h-3.5" />
+            <Mic2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>Lyrics</span>
           </button>
           <button
             onClick={() => setActiveTab('visualizer')}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-all ${
               activeTab === 'visualizer' ? 'bg-white text-slate-950 shadow-md' : 'text-slate-300 hover:text-white'
             }`}
           >
-            <Waves className="w-3.5 h-3.5" />
+            <Waves className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>Visualizer</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           {/* More Like This */}
           <button
             onClick={() => setMoreLikeThisOpen(true)}
             aria-label="More Like This"
             title="More Like This (Related & Same Genre)"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors"
+            className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors"
           >
             <Sparkles className="w-3.5 h-3.5 text-[var(--aura-primary,#6366f1)]" />
             <span className="hidden sm:inline">More Like This</span>
@@ -141,12 +141,12 @@ export const ExpandedPlayer: React.FC = () => {
             onClick={() => setJamModalOpen(true)}
             aria-label="Car Group Play"
             title="Car Group Play (Jam Session)"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-              jamSession ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-white/10 hover:bg-white/20 text-white'
+            className={`flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              jamRoom ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-white/10 hover:bg-white/20 text-white'
             }`}
           >
             <Car className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{jamSession ? 'Car Jam' : 'Group Play'}</span>
+            <span className="hidden sm:inline">{jamRoom ? 'Car Jam' : 'Group Play'}</span>
           </button>
 
           {/* Studio EQ Console */}
@@ -156,19 +156,19 @@ export const ExpandedPlayer: React.FC = () => {
             title="Studio Equalizer"
             className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <SlidersHorizontal className="w-5 h-5" />
+            <SlidersHorizontal className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
 
       {/* Main Center Stage */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 max-w-4xl mx-auto w-full overflow-hidden">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 sm:p-6 max-w-4xl mx-auto w-full overflow-y-auto no-scrollbar">
         
         {/* TAB 1: Cinematic Artwork View */}
         {activeTab === 'artwork' && (
-          <div className="flex flex-col items-center text-center max-w-md w-full animate-fadeIn">
+          <div className="flex flex-col items-center text-center max-w-md w-full animate-fadeIn my-auto">
             <div 
-              className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-2xl overflow-hidden shadow-2xl mb-8 border border-white/15 group"
+              className="relative w-52 h-52 sm:w-80 sm:h-80 rounded-2xl overflow-hidden shadow-2xl mb-4 sm:mb-8 border border-white/15 group"
               style={{
                 boxShadow: '0 25px 50px -12px var(--aura-glow, rgba(0,0,0,0.7))',
               }}

@@ -63,9 +63,9 @@ export const JamHubModal: React.FC = () => {
         role="dialog"
         aria-modal="true"
         aria-label="Aura Jam Listening Room"
-        className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-black/90 backdrop-blur-2xl overflow-y-auto no-scrollbar"
+        className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-6 bg-black/90 backdrop-blur-2xl overflow-y-auto no-scrollbar pt-safe pb-safe"
       >
-        <div className="relative w-full max-w-6xl my-auto">
+        <div className="relative w-full max-w-6xl my-1 sm:my-auto">
           {/* Close / Minimize button */}
           <button
             onClick={() => setJamModalOpen(false)}
@@ -181,35 +181,39 @@ export const JamHubModal: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-400">
-              <span>Enter room code</span>
+              <span>Scan QR or enter code</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
         </div>
 
         {/* Quick Join Input & QR Camera Scanner Trigger */}
-        <div className="flex items-center gap-2 p-2 rounded-2xl bg-white/[0.02] border border-white/10">
-          <input
-            type="text"
-            placeholder="Have a code? e.g. X7K92P"
-            value={quickCode}
-            onChange={(e) => setQuickCode(e.target.value.toUpperCase())}
-            className="flex-1 px-3 py-2 bg-transparent text-sm font-mono text-white placeholder-slate-500 focus:outline-none"
-          />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 rounded-2xl bg-white/[0.02] border border-white/10">
           <button
+            type="button"
             onClick={() => setShowScanner(true)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
-            title="Scan QR Code via Camera"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-bold text-xs transition-colors cursor-pointer"
           >
-            <QrCode className="w-4 h-4" />
+            <QrCode className="w-4 h-4 text-emerald-400" />
+            <span>Scan QR Code with Camera</span>
           </button>
-          <button
-            onClick={() => quickCode.trim() && joinJam(quickCode.trim())}
-            disabled={!quickCode.trim()}
-            className="px-4 py-2 rounded-xl bg-white text-slate-950 font-bold text-xs hover:bg-slate-200 transition-colors disabled:opacity-40 cursor-pointer"
-          >
-            Join
-          </button>
+          <div className="flex-1 flex items-center gap-2 bg-black/40 rounded-xl px-3 py-1 border border-white/5">
+            <input
+              type="text"
+              placeholder="Or enter code: e.g. X7K92P"
+              value={quickCode}
+              onChange={(e) => setQuickCode(e.target.value.toUpperCase())}
+              className="flex-1 py-1.5 bg-transparent text-sm font-mono text-white placeholder-slate-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => quickCode.trim() && joinJam(quickCode.trim())}
+              disabled={!quickCode.trim()}
+              className="px-4 py-1.5 rounded-lg bg-white text-slate-950 font-bold text-xs hover:bg-slate-200 transition-colors disabled:opacity-40 cursor-pointer"
+            >
+              Join
+            </button>
+          </div>
         </div>
 
         {/* Public Discoverable Jams (Spec #36) */}
@@ -256,14 +260,18 @@ export const JamHubModal: React.FC = () => {
 
         {/* QR Camera Scanner Modal if opened */}
         {showScanner && (
-          <QRCodeScanner
-            onScan={(scannedCode: string) => {
-              setShowScanner(false);
-              setQuickCode(scannedCode);
-              joinJam(scannedCode);
-            }}
-            onClose={() => setShowScanner(false)}
-          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-fadeIn">
+            <div className="relative w-full max-w-sm bg-[#0c0f17] border border-white/10 rounded-3xl p-5 shadow-2xl">
+              <QRCodeScanner
+                onScan={(scannedCode: string) => {
+                  setShowScanner(false);
+                  setQuickCode(scannedCode);
+                  joinJam(scannedCode);
+                }}
+                onClose={() => setShowScanner(false)}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>

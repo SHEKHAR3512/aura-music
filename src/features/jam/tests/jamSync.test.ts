@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { DriftCorrection } from '../sync/DriftCorrection';
 import { SYNC_CONFIG } from '../sync/SyncConfig';
 import { JamPresenceService } from '../services/JamPresenceService';
@@ -204,7 +205,8 @@ async function runJamTests() {
   console.log('\n--- ALL JAM REALTIME ENGINE TESTS PASSED! ---\n');
 }
 
-runJamTests().catch((err) => {
-  console.error(err);
-  process.exit(1);
+describe('Jam Realtime Engine Suite', () => {
+  it('passes all jam engine sync and drift tests', async () => {
+    await runJamTests();
+  });
 });

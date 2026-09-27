@@ -56,6 +56,7 @@ class JamSessionManager {
 
 
   public init(server: Server) {
+    this.seedDefaultRooms();
     this.wss = new WebSocketServer({ server, path: '/ws/jam' });
 
     this.wss.on('connection', (ws: ClientSocket, req: IncomingMessage) => {
@@ -699,6 +700,174 @@ class JamSessionManager {
     }
     const finalCode = `JAM-${code}`;
     return this.sessions.has(finalCode) ? this.generateSessionCode() : finalCode;
+  }
+
+  private seedDefaultRooms() {
+    const now = Date.now();
+    const chillRoom: JamRoomState = {
+      metadata: {
+        id: 'CHILL1',
+        name: 'Lofi & Ambient Sanctuary',
+        hostId: 'aura-curator-chill',
+        createdAt: now,
+        expiresAt: now + 30 * 86400 * 1000,
+        privacy: 'public_link',
+        mode: 'chill',
+        inviteToken: 'CHILL1-INVITE',
+        active: true,
+      },
+      playback: {
+        trackId: 'curated-kesariya',
+        track: {
+          id: 'curated-kesariya',
+          title: 'Kesariya',
+          artists: [{ id: 'pritam', name: 'Pritam' }, { id: 'arijit-singh', name: 'Arijit Singh' }],
+          primaryArtist: 'Arijit Singh',
+          album: { id: 'brahmastra', title: 'Brahmastra', artwork: 'https://c.saavncdn.com/054/Pritam-All-Time-Hits-Hindi-2023-20230529184043-500x500.jpg' },
+          artwork: {
+            low: 'https://c.saavncdn.com/054/Pritam-All-Time-Hits-Hindi-2023-20230529184043-150x150.jpg',
+            medium: 'https://c.saavncdn.com/054/Pritam-All-Time-Hits-Hindi-2023-20230529184043-500x500.jpg',
+            high: 'https://c.saavncdn.com/054/Pritam-All-Time-Hits-Hindi-2023-20230529184043-500x500.jpg'
+          },
+          duration: 268,
+          audioUrl: 'https://aac.saavncdn.com/054/4183c8b4a67c70231da0d90701ca39f5_320.mp4',
+          language: 'Hindi',
+          year: '2022',
+          explicit: false,
+          hasLyrics: true,
+          source: 'curated',
+          sourceId: 'curated-kesariya',
+        },
+        isPlaying: true,
+        position: 12,
+        playbackStartedAt: now - 12000,
+        playbackVersion: 1,
+        updatedAt: now,
+        updatedBy: 'aura-curator-chill',
+      },
+      queue: [],
+      participants: {
+        'aura-curator-chill': {
+          id: 'aura-curator-chill',
+          displayName: 'Aura Chill Curator',
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+          role: 'host',
+          isOnline: true,
+          joinedAt: now,
+          lastSeen: now,
+        },
+      },
+      settings: {
+        allowGuestQueue: true,
+        allowGuestReorder: true,
+        allowGuestSkip: true,
+        allowGuestPause: true,
+        allowGuestSeek: true,
+        allowGuestVolume: true,
+        allowReactions: true,
+        allowRecommendations: true,
+        voteSkipThresholdPercent: 50,
+      },
+      reactions: [],
+      activity: [
+        {
+          id: 'chill-init',
+          type: 'USER_JOIN',
+          actorId: 'aura-curator-chill',
+          actorName: 'Aura Chill Curator',
+          timestamp: now,
+          message: 'Lofi & Ambient Sanctuary session started',
+        },
+      ],
+      songRequests: [],
+      skipVotes: [],
+      sequenceNumber: 1,
+      serverTimestamp: now,
+    };
+
+    const hitRoom: JamRoomState = {
+      metadata: {
+        id: 'HIT88',
+        name: 'Global Chart Toppers',
+        hostId: 'aura-curator-hits',
+        createdAt: now,
+        expiresAt: now + 30 * 86400 * 1000,
+        privacy: 'public_link',
+        mode: 'party',
+        inviteToken: 'HIT88-INVITE',
+        active: true,
+      },
+      playback: {
+        trackId: 'curated-starboy',
+        track: {
+          id: 'curated-starboy',
+          title: 'Starboy',
+          artists: [{ id: 'the-weeknd', name: 'The Weeknd' }, { id: 'daft-punk', name: 'Daft Punk' }],
+          primaryArtist: 'The Weeknd',
+          album: { id: 'starboy-album', title: 'Starboy', artwork: 'https://c.saavncdn.com/372/Starboy-English-2016-500x500.jpg' },
+          artwork: {
+            low: 'https://c.saavncdn.com/372/Starboy-English-2016-150x150.jpg',
+            medium: 'https://c.saavncdn.com/372/Starboy-English-2016-500x500.jpg',
+            high: 'https://c.saavncdn.com/372/Starboy-English-2016-500x500.jpg'
+          },
+          duration: 230,
+          audioUrl: 'https://aac.saavncdn.com/372/2d22028e95d06cf831e083eb6fb2fe9c_320.mp4',
+          language: 'English',
+          year: '2016',
+          explicit: true,
+          hasLyrics: true,
+          source: 'curated',
+          sourceId: 'curated-starboy',
+        },
+        isPlaying: true,
+        position: 25,
+        playbackStartedAt: now - 25000,
+        playbackVersion: 1,
+        updatedAt: now,
+        updatedBy: 'aura-curator-hits',
+      },
+      queue: [],
+      participants: {
+        'aura-curator-hits': {
+          id: 'aura-curator-hits',
+          displayName: 'DJ Aura Hits',
+          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+          role: 'host',
+          isOnline: true,
+          joinedAt: now,
+          lastSeen: now,
+        },
+      },
+      settings: {
+        allowGuestQueue: true,
+        allowGuestReorder: true,
+        allowGuestSkip: true,
+        allowGuestPause: true,
+        allowGuestSeek: true,
+        allowGuestVolume: true,
+        allowReactions: true,
+        allowRecommendations: true,
+        voteSkipThresholdPercent: 50,
+      },
+      reactions: [],
+      activity: [
+        {
+          id: 'hit-init',
+          type: 'USER_JOIN',
+          actorId: 'aura-curator-hits',
+          actorName: 'DJ Aura Hits',
+          timestamp: now,
+          message: 'Global Chart Toppers party started',
+        },
+      ],
+      songRequests: [],
+      skipVotes: [],
+      sequenceNumber: 1,
+      serverTimestamp: now,
+    };
+
+    this.nextGenRooms.set('CHILL1', chillRoom);
+    this.nextGenRooms.set('HIT88', hitRoom);
   }
 }
 

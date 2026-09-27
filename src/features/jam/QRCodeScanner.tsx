@@ -15,20 +15,36 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose })
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(true);
 
-  // Extract jam code from QR data (could be a URL like "?jam=JAM-XXXX" or just the code)
+  // Extract jam code from QR data (supports "/jam/XXXX", "?jam=XXXX", or raw code)
   const extractJamCode = useCallback((data: string): string | null => {
-    // Try URL format: https://...?jam=JAM-XXXX
+    if (!data) return null;
+
+    // 1. Try URL parsing (absolute or relative)
     try {
-      const url = new URL(data);
-      const jamCode = url.searchParams.get('jam');
-      if (jamCode) return jamCode.toUpperCase();
+      const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+      const url = new URL(data, base);
+
+      // Check query param ?jam=XXXX
+      const jamParam = url.searchParams.get('jam');
+      if (jamParam) return jamParam.trim().toUpperCase();
+
+      // Check path format /jam/:roomId
+      const match = url.pathname.match(/\/jam\/([A-Za-z0-9_-]+)/i);
+      if (match && match[1]) {
+        return match[1].trim().toUpperCase();
+      }
     } catch {
-      // Not a URL
+      // Fallback regex matching
+      const match = data.match(/\/jam\/([A-Za-z0-9_-]+)/i);
+      if (match && match[1]) {
+        return match[1].trim().toUpperCase();
+      }
     }
-    // Try raw code format: JAM-XXXX or just XXXX
+
+    // 2. Try raw code format: JAM-XXXX or 4-10 alphanumeric characters
     const cleaned = data.trim().toUpperCase();
     if (/^JAM-[A-Z0-9]{4,}$/.test(cleaned)) return cleaned;
-    if (/^[A-Z0-9]{4,8}$/.test(cleaned)) return cleaned;
+    if (/^[A-Z0-9]{4,10}$/.test(cleaned)) return cleaned;
     return null;
   }, []);
 
@@ -48,14 +64,23 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose })
     setError(null);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' }, // Rear camera preferred
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-        },
-        audio: false,
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' }, // Rear camera preferred
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+      } catch (e) {
+        // Fallback for devices/browsers that fail with complex video constraints
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
 
       streamRef.current = stream;
 

@@ -16,9 +16,37 @@ export function generateInviteToken(): string {
   return `${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
 }
 
-export function getJamShareUrl(roomId: string, inviteToken?: string): string {
+let cachedNetworkOrigin: string | null = null;
+
+if (typeof window !== 'undefined') {
+  fetch('/api/system/info')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (data?.url) {
+        cachedNetworkOrigin = data.url;
+      }
+    })
+    .catch(() => {});
+}
+
+export function getCachedNetworkOrigin(): string | null {
+  return cachedNetworkOrigin;
+}
+
+export function getJamShareUrl(roomId: string, inviteToken?: string, preferNetworkIp: boolean = true): string {
   if (typeof window === 'undefined') return `/jam/${roomId}`;
-  const origin = window.location.origin;
+  let origin = window.location.origin;
+
+  // When on localhost/127.0.0.1 and a network IP is available, prefer the network IP
+  // so phones scanning the QR code or opening the link can connect seamlessly
+  if (
+    preferNetworkIp &&
+    cachedNetworkOrigin &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ) {
+    origin = cachedNetworkOrigin;
+  }
+
   const tokenParam = inviteToken ? `?token=${encodeURIComponent(inviteToken)}` : '';
   return `${origin}/jam/${roomId}${tokenParam}`;
 }

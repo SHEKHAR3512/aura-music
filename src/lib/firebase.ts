@@ -18,8 +18,7 @@ const firebaseConfig = {
   messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1234567890',
   appId: env.VITE_FIREBASE_APP_ID || '1:1234567890:web:abcdef123456',
   measurementId: env.VITE_FIREBASE_MEASUREMENT_ID,
-  databaseURL: env.VITE_FIREBASE_DATABASE_URL || 
-    (env.VITE_FIREBASE_PROJECT_ID ? `https://${env.VITE_FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com` : 'https://aura-music-demo-default-rtdb.firebaseio.com'),
+  databaseURL: env.VITE_FIREBASE_DATABASE_URL || undefined,
 };
 
 // Prevent re-initialization on hot-reload
@@ -31,10 +30,12 @@ export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 let rtdbInstance: Database | null = null;
-try {
-  rtdbInstance = getDatabase(app);
-} catch (e) {
-  console.warn('Firebase Realtime Database initialization notice:', e);
+if (env.VITE_FIREBASE_DATABASE_URL) {
+  try {
+    rtdbInstance = getDatabase(app);
+  } catch (e) {
+    console.warn('Firebase Realtime Database initialization notice:', e);
+  }
 }
 export const rtdb = rtdbInstance;
 

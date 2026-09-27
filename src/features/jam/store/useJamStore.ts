@@ -70,6 +70,10 @@ interface JamStoreState {
   endJam: () => Promise<JamSessionSummary | null>;
 
   // Playback & Queue Controls
+  isAudioOutput: boolean;
+  toggleAudioOutput: () => void;
+  setAudioOutput: (enabled: boolean) => void;
+  playTrack: (track: Song) => Promise<void>;
   play: () => Promise<void>;
   pause: () => Promise<void>;
   seek: (seconds: number) => Promise<void>;
@@ -125,6 +129,7 @@ export const useJamStore = create<JamStoreState>((set, get) => {
     clockOffset: 0,
     driftMs: 0,
     isSynced: false,
+    isAudioOutput: true,
 
     userId: getInitialUserId(),
     userName: (typeof window !== 'undefined' && localStorage.getItem(STORAGE_NAME_KEY)) || 'Aura Listener',
@@ -205,9 +210,11 @@ export const useJamStore = create<JamStoreState>((set, get) => {
         roomDNA: dna,
         connectionState: 'connected',
         isCreateModalOpen: false,
+        isAudioOutput: true,
       });
 
       // Attach sync engine & presence
+      jamSyncEngine.setAudioOutputEnabled(true);
       jamSyncEngine.attachRoom(newRoom.metadata.id);
       jamPresenceService.startHeartbeat(newRoom.metadata.id, {
         id: state.userId,
@@ -237,6 +244,27 @@ export const useJamStore = create<JamStoreState>((set, get) => {
       const state = get();
 
       try {
+        // Pre-fetch room state immediately if available
+        const preloaded = await jamRepository.getRoom(cleanId);
+        if (preloaded) {
+          const allSongs: Song[] = [];
+          if (preloaded.playback.track) allSongs.push(preloaded.playback.track);
+          preloaded.queue.forEach((q) => allSongs.push(q.track));
+
+          const computedDNA = RoomDNAEngine.calculate(
+            allSongs,
+            Object.keys(preloaded.participants || {}).length,
+            preloaded.metadata.mode
+          );
+
+          set({
+            room: preloaded,
+            roomDNA: computedDNA,
+            connectionState: 'connected',
+            isJoinModalOpen: false,
+          });
+        }
+
         await JamService.joinRoom(cleanId, {
           id: state.userId,
           name: state.userName,
@@ -294,19 +322,25 @@ export const useJamStore = create<JamStoreState>((set, get) => {
           });
         });
 
+        const activeRoom = get().room || preloaded;
+        const isHost = activeRoom ? activeRoom.metadata.hostId === state.userId : false;
+        // Host device outputs audio; joining devices default to Remote Controller mode (false) to avoid double-play echo!
+        const isAudioOutput = isHost;
+
+        jamSyncEngine.setAudioOutputEnabled(isAudioOutput);
         jamSyncEngine.attachRoom(cleanId);
         jamPresenceService.startHeartbeat(cleanId, {
           id: state.userId,
           displayName: state.userName,
           avatar: state.userAvatar,
-          role: 'guest',
+          role: isHost ? 'host' : 'guest',
           isOnline: true,
           joinedAt: Date.now(),
           lastSeen: Date.now(),
           isAnonymous: state.isAnonymous,
         });
 
-        set({ connectionState: 'connected', isJoinModalOpen: false });
+        set({ connectionState: 'connected', isJoinModalOpen: false, isAudioOutput });
         return true;
       } catch (err: any) {
         set({ connectionState: 'disconnected' });
@@ -329,6 +363,7 @@ export const useJamStore = create<JamStoreState>((set, get) => {
         syncUnsubscribe = null;
       }
 
+      jamSyncEngine.setAudioOutputEnabled(true);
       jamSyncEngine.detachRoom();
       jamPresenceService.stopHeartbeat();
 
@@ -337,6 +372,7 @@ export const useJamStore = create<JamStoreState>((set, get) => {
         roomDNA: null,
         connectionState: 'disconnected',
         isSynced: false,
+        isAudioOutput: true,
       });
     },
 
@@ -348,6 +384,29 @@ export const useJamStore = create<JamStoreState>((set, get) => {
       get().leaveJam();
       set({ summary, isSummaryModalOpen: true });
       return summary;
+    },
+
+    toggleAudioOutput: () => {
+      const next = !get().isAudioOutput;
+      get().setAudioOutput(next);
+    },
+
+    setAudioOutput: (enabled: boolean) => {
+      set({ isAudioOutput: enabled });
+      jamSyncEngine.setAudioOutputEnabled(enabled);
+    },
+
+    playTrack: async (track: Song) => {
+      const { room, userId, userName, userAvatar } = get();
+      if (!room) return;
+      const isHost = room.metadata.hostId === userId;
+      const canDirectPlay = isHost || room.settings.allowGuestSkip || !room.playback.trackId;
+
+      if (canDirectPlay) {
+        await JamPlaybackService.changeTrack(room, userId, userName, track);
+      } else {
+        await JamQueueService.addToQueue(room, { id: userId, name: userName, avatar: userAvatar }, track);
+      }
     },
 
     play: async () => {

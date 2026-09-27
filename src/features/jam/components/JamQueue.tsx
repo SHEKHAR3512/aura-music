@@ -20,6 +20,7 @@ import {
   GripVertical,
   Trash2,
   Plus,
+  Play,
   Sparkles,
   FastForward,
   Music,
@@ -36,6 +37,7 @@ interface SortableQueueItemProps {
   canReorder: boolean;
   canDelete: boolean;
   onDelete: (id: string) => void;
+  onPlay?: (track: Song) => void;
 }
 
 const SortableQueueRow: React.FC<SortableQueueItemProps> = ({
@@ -44,6 +46,7 @@ const SortableQueueRow: React.FC<SortableQueueItemProps> = ({
   canReorder,
   canDelete,
   onDelete,
+  onPlay,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -79,16 +82,31 @@ const SortableQueueRow: React.FC<SortableQueueItemProps> = ({
         </span>
       )}
 
-      {/* Artwork */}
-      <img
-        src={item.track.artwork.low || item.track.artwork.medium}
-        alt={item.track.title}
-        className="w-9 h-9 rounded-lg object-cover shrink-0 border border-white/10"
-      />
+      {/* Artwork with Play on click */}
+      <div
+        onClick={() => onPlay && onPlay(item.track)}
+        className="relative w-9 h-9 rounded-lg overflow-hidden shrink-0 border border-white/10 cursor-pointer group/art"
+      >
+        <img
+          src={item.track.artwork.low || item.track.artwork.medium}
+          alt={item.track.title}
+          className="w-full h-full object-cover"
+        />
+        {onPlay && (
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/art:opacity-100 flex items-center justify-center transition-opacity">
+            <Play className="w-3.5 h-3.5 text-white fill-current" />
+          </div>
+        )}
+      </div>
 
-      {/* Details */}
-      <div className="flex-1 min-w-0">
-        <h5 className="text-xs font-semibold text-white truncate">{item.track.title}</h5>
+      {/* Details (Click to play) */}
+      <div
+        onClick={() => onPlay && onPlay(item.track)}
+        className="flex-1 min-w-0 cursor-pointer"
+      >
+        <h5 className="text-xs font-semibold text-white truncate hover:text-[var(--aura-primary,#6366f1)] transition-colors">
+          {item.track.title}
+        </h5>
         <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
           <span className="truncate max-w-[110px]">{item.track.primaryArtist}</span>
           <span>•</span>
@@ -116,6 +134,7 @@ export const JamQueue: React.FC<{ onOpenSearch?: () => void }> = ({ onOpenSearch
   const {
     room,
     userId,
+    playTrack,
     addToQueue,
     removeFromQueue,
     reorderQueue,
@@ -134,8 +153,8 @@ export const JamQueue: React.FC<{ onOpenSearch?: () => void }> = ({ onOpenSearch
 
   const queue = room?.queue || [];
   const isHost = room?.metadata.hostId === userId;
-  const canReorder = isHost || !!room?.settings.allowGuestReorder;
-  const canQueue = isHost || !!room?.settings.allowGuestQueue;
+  const canReorder = isHost || room?.settings?.allowGuestReorder !== false;
+  const canQueue = isHost || room?.settings?.allowGuestQueue !== false;
 
   // Load Smart Queue recommendations
   useEffect(() => {
@@ -224,18 +243,30 @@ export const JamQueue: React.FC<{ onOpenSearch?: () => void }> = ({ onOpenSearch
                   canReorder={canReorder}
                   canDelete={isHost || item.addedBy.id === userId}
                   onDelete={removeFromQueue}
+                  onPlay={playTrack}
                 />
               ))}
             </div>
           </SortableContext>
         </DndContext>
       ) : (
-        <div className="p-6 text-center rounded-2xl bg-white/[0.02] border border-dashed border-white/10 space-y-2">
+        <div className="p-6 text-center rounded-2xl bg-white/[0.02] border border-dashed border-white/10 space-y-3">
           <Music className="w-8 h-8 text-slate-600 mx-auto" />
-          <h5 className="text-xs font-semibold text-slate-300">The Queue is Empty</h5>
-          <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
-            Add your favorite tracks or pick an intelligent group recommendation below.
-          </p>
+          <div>
+            <h5 className="text-xs font-semibold text-slate-300">The Queue is Empty</h5>
+            <p className="text-[11px] text-slate-500 max-w-xs mx-auto mt-0.5">
+              Add your favorite tracks or pick an intelligent group recommendation below.
+            </p>
+          </div>
+          {onOpenSearch && (
+            <button
+              onClick={onOpenSearch}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[var(--aura-primary,#6366f1)] hover:bg-[var(--aura-primary,#6366f1)]/90 text-white text-xs font-bold shadow-md transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Search & Add Songs</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -275,12 +306,21 @@ export const JamQueue: React.FC<{ onOpenSearch?: () => void }> = ({ onOpenSearch
                   </div>
                 </div>
 
-                <button
-                  onClick={() => addToQueue(rec.song)}
-                  className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-slate-200 text-[10px] font-bold border border-white/10 transition-colors shrink-0 ml-2 cursor-pointer"
-                >
-                  + Queue
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  <button
+                    onClick={() => playTrack(rec.song)}
+                    className="p-1 rounded-lg bg-[var(--aura-primary,#6366f1)] hover:opacity-90 text-white transition-opacity cursor-pointer"
+                    title="Play track now"
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                  </button>
+                  <button
+                    onClick={() => addToQueue(rec.song)}
+                    className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-slate-200 text-[10px] font-bold border border-white/10 transition-colors cursor-pointer"
+                  >
+                    + Queue
+                  </button>
+                </div>
               </div>
             ))}
           </div>

@@ -4,6 +4,7 @@ dotenv.config();
 import express, { Request, Response } from 'express';
 import http from 'http';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import { musicProvider } from './src/lib/music/provider';
@@ -254,6 +255,28 @@ app.get('/api/music/related/:id', async (req: Request, res: Response) => {
 // JAM / GROUP PLAY REST API ENDPOINTS
 // -------------------------------------------------------------
 
+function getNetworkIp(): string | null {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name] || []) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return null;
+}
+
+// System network & connectivity discovery endpoint
+app.get('/api/system/info', (_req: Request, res: Response) => {
+  const netIp = getNetworkIp();
+  res.json({
+    ip: netIp || 'localhost',
+    port: PORT,
+    url: netIp ? `http://${netIp}:${PORT}` : `http://localhost:${PORT}`,
+  });
+});
+
 // NTP Clock Calibration Ping Endpoint
 app.all('/api/jam/ping', (req: Request, res: Response) => {
   const clientTime = req.query.clientTime
@@ -272,6 +295,16 @@ app.post('/api/jam/create-room', (req: Request, res: Response) => {
     jamManager.setRoomState(state.metadata.id, state);
   }
   res.json({ success: true });
+});
+
+// Next-Gen Jam Listening Room Fetch Endpoint
+app.get('/api/jam/room/:id', (req: Request, res: Response) => {
+  const roomId = req.params.id?.toUpperCase();
+  const room = jamManager.getRoomState(roomId);
+  if (!room) {
+    return res.status(404).json({ error: 'Jam room not found' });
+  }
+  res.json({ success: true, room });
 });
 
 // Next-Gen Jam Listening Room Action Endpoint (Dual Transport Fallback)
@@ -616,8 +649,13 @@ async function startServer() {
   }
 
   server.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`AURA Sound Server running on port ${PORT} [${isProd ? 'production' : 'development'}]`);
-    console.log(`Car Jam Real-Time WebSocket active on ws://0.0.0.0:${PORT}/ws/jam`);
+    const netIp = getNetworkIp();
+    console.log(`\n  🎵 AURA Sound Server running [${isProd ? 'production' : 'development'}]:`);
+    console.log(`  ➜ Local:   http://localhost:${PORT}`);
+    if (netIp) {
+      console.log(`  ➜ Network: http://${netIp}:${PORT}  (Open this on your iPhone / mobile devices)`);
+    }
+    console.log(`  ➜ WebSocket: ws://0.0.0.0:${PORT}/ws/jam\n`);
   });
 }
 

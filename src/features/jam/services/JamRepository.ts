@@ -2,7 +2,6 @@ import { rtdb, db } from '../../../lib/firebase';
 import {
   ref,
   set,
-  get,
   update,
   onValue,
   onDisconnect,
@@ -26,14 +25,14 @@ import {
 /**
  * JamRepository
  * Unified data access layer for Jam listening rooms.
- * Bridges Firebase Realtime Database with intelligent Server WebSocket fallback
- * for zero-downtime offline/local resilience.
+ * Features immediate server/local WebSocket communication with optional
+ * Firebase Realtime Database dual transport and offline localStorage caching.
  */
 class JamRepository {
   private activeWs: WebSocket | null = null;
-  private wsListeners = new Set<(state: JamRoomState) => void>();
   private activeRoomId: string | null = null;
   private rtdbUnsub: Unsubscribe | null = null;
+  private reconnectTimeout: any = null;
 
   /**
    * Creates a new Jam listening room
@@ -69,21 +68,14 @@ class JamRepository {
       serverTimestamp: Date.now(),
     };
 
-    // 1. Try Firebase RTDB
-    if (rtdb) {
+    // 1. Store in localStorage cache for instant client recovery
+    if (typeof window !== 'undefined') {
       try {
-        const roomRef = ref(rtdb, `jams/${metadata.id}`);
-        await set(roomRef, initialState);
-
-        // Setup onDisconnect for host presence
-        const hostPresenceRef = ref(rtdb, `jams/${metadata.id}/participants/${host.id}/isOnline`);
-        onDisconnect(hostPresenceRef).set(false);
-      } catch (err) {
-        console.warn('JamRepository: Firebase RTDB set notice (falling back to server WS):', err);
-      }
+        localStorage.setItem(`aura_jam_room_${metadata.id}`, JSON.stringify(initialState));
+      } catch (e) {}
     }
 
-    // 2. Also register on Server API for dual transport resilience
+    // 2. Register on Server REST API (Local Express + WebSocket server)
     try {
       await fetch('/api/jam/create-room', {
         method: 'POST',
@@ -91,10 +83,49 @@ class JamRepository {
         body: JSON.stringify(initialState),
       });
     } catch (e) {
-      // Offline / standalone
+      console.warn('JamRepository: Local server room registration notice:', e);
+    }
+
+    // 3. Optional Firebase RTDB (non-blocking in background)
+    if (rtdb) {
+      try {
+        const roomRef = ref(rtdb, `jams/${metadata.id}`);
+        set(roomRef, initialState).catch(() => {});
+
+        const hostPresenceRef = ref(rtdb, `jams/${metadata.id}/participants/${host.id}/isOnline`);
+        onDisconnect(hostPresenceRef).set(false).catch(() => {});
+      } catch (err) {
+        console.warn('JamRepository: Firebase RTDB set notice:', err);
+      }
     }
 
     return initialState;
+  }
+
+  /**
+   * Fetches room state from server API or local cache
+   */
+  public async getRoom(roomId: string): Promise<JamRoomState | null> {
+    const cleanId = roomId.trim().toUpperCase();
+
+    // 1. Try server REST API
+    try {
+      const res = await fetch(`/api/jam/room/${cleanId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.room) return data.room as JamRoomState;
+      }
+    } catch (e) {}
+
+    // 2. Try localStorage fallback
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(`aura_jam_room_${cleanId}`);
+        if (cached) return JSON.parse(cached) as JamRoomState;
+      } catch (e) {}
+    }
+
+    return null;
   }
 
   /**
@@ -103,14 +134,41 @@ class JamRepository {
   public subscribeToRoom(
     roomId: string,
     onUpdate: (state: JamRoomState) => void,
-    onError?: (err: Error) => void
+    _onError?: (err: Error) => void
   ): () => void {
-    this.activeRoomId = roomId;
+    const cleanId = roomId.trim().toUpperCase();
+    this.activeRoomId = cleanId;
 
-    // 1. If Firebase RTDB is available, listen via onValue
+    // 1. Fetch initial state immediately from REST API
+    fetch(`/api/jam/room/${cleanId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.room && this.activeRoomId === cleanId) {
+          onUpdate(data.room);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Check localStorage cache for instant display
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(`aura_jam_room_${cleanId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.metadata?.id?.toUpperCase() === cleanId) {
+            onUpdate(parsed);
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. Connect real-time WebSocket to server
+    this.initWebSocket(cleanId, onUpdate);
+
+    // 4. If Firebase RTDB is configured, also subscribe to RTDB
     if (rtdb) {
       try {
-        const roomRef = ref(rtdb, `jams/${roomId}`);
+        const roomRef = ref(rtdb, `jams/${cleanId}`);
         this.rtdbUnsub = onValue(
           roomRef,
           (snapshot) => {
@@ -120,16 +178,12 @@ class JamRepository {
             }
           },
           (err) => {
-            console.warn('JamRepository RTDB subscription error, switching to WS:', err);
-            this.initWebSocket(roomId, onUpdate);
+            console.warn('JamRepository RTDB subscription error:', err);
           }
         );
       } catch (e) {
-        this.initWebSocket(roomId, onUpdate);
+        console.warn('JamRepository RTDB attach error:', e);
       }
-    } else {
-      // 2. Fallback to WebSocket
-      this.initWebSocket(roomId, onUpdate);
     }
 
     return () => {
@@ -149,11 +203,11 @@ class JamRepository {
     if (rtdb) {
       try {
         const playbackRef = ref(rtdb, `jams/${roomId}/playback`);
-        await update(playbackRef, {
+        update(playbackRef, {
           ...playback,
           updatedAt: rtdbServerTimestamp(),
-        });
-        await update(ref(rtdb, `jams/${roomId}`), { sequenceNumber });
+        }).catch(() => {});
+        update(ref(rtdb, `jams/${roomId}`), { sequenceNumber }).catch(() => {});
       } catch (e) {}
     }
 
@@ -166,7 +220,7 @@ class JamRepository {
   public async addQueueItem(roomId: string, item: JamQueueItem, newQueue: JamQueueItem[]) {
     if (rtdb) {
       try {
-        await set(ref(rtdb, `jams/${roomId}/queue`), newQueue);
+        set(ref(rtdb, `jams/${roomId}/queue`), newQueue).catch(() => {});
       } catch (e) {}
     }
     this.sendWsMessage('QUEUE_ADD', { roomId, item, queue: newQueue });
@@ -178,7 +232,7 @@ class JamRepository {
   public async setQueue(roomId: string, newQueue: JamQueueItem[]) {
     if (rtdb) {
       try {
-        await set(ref(rtdb, `jams/${roomId}/queue`), newQueue);
+        set(ref(rtdb, `jams/${roomId}/queue`), newQueue).catch(() => {});
       } catch (e) {}
     }
     this.sendWsMessage('QUEUE_SET', { roomId, queue: newQueue });
@@ -191,7 +245,7 @@ class JamRepository {
     if (rtdb) {
       try {
         const reactionsRef = ref(rtdb, `jams/${roomId}/reactions`);
-        await update(reactionsRef, { [reaction.id]: reaction });
+        update(reactionsRef, { [reaction.id]: reaction }).catch(() => {});
       } catch (e) {}
     }
     this.sendWsMessage('REACTION', { roomId, reaction });
@@ -204,7 +258,7 @@ class JamRepository {
     if (rtdb) {
       try {
         const actRef = ref(rtdb, `jams/${roomId}/activity/${event.id}`);
-        await set(actRef, event);
+        set(actRef, event).catch(() => {});
       } catch (e) {}
     }
     this.sendWsMessage('ACTIVITY', { roomId, event });
@@ -216,7 +270,7 @@ class JamRepository {
   public async updateSettings(roomId: string, settings: JamSettings) {
     if (rtdb) {
       try {
-        await update(ref(rtdb, `jams/${roomId}/settings`), settings);
+        update(ref(rtdb, `jams/${roomId}/settings`), settings).catch(() => {});
       } catch (e) {}
     }
     this.sendWsMessage('SETTINGS_UPDATE', { roomId, settings });
@@ -228,7 +282,7 @@ class JamRepository {
   public async voteSkip(roomId: string, userId: string, votes: string[]) {
     if (rtdb) {
       try {
-        await set(ref(rtdb, `jams/${roomId}/skipVotes`), votes);
+        set(ref(rtdb, `jams/${roomId}/skipVotes`), votes).catch(() => {});
       } catch (e) {}
     }
     this.sendWsMessage('VOTE_SKIP', { roomId, userId, votes });
@@ -240,7 +294,7 @@ class JamRepository {
   public async requestSong(roomId: string, request: JamSongRequest) {
     if (rtdb) {
       try {
-        await set(ref(rtdb, `jams/${roomId}/songRequests/${request.id}`), request);
+        set(ref(rtdb, `jams/${roomId}/songRequests/${request.id}`), request).catch(() => {});
       } catch (e) {}
     }
     this.sendWsMessage('SONG_REQUEST', { roomId, request });
@@ -252,12 +306,12 @@ class JamRepository {
   public async sendHeartbeat(roomId: string, participant: JamParticipant) {
     if (rtdb) {
       try {
-        await update(ref(rtdb, `jams/${roomId}/participants/${participant.id}`), {
+        update(ref(rtdb, `jams/${roomId}/participants/${participant.id}`), {
           lastSeen: Date.now(),
           isOnline: true,
           displayName: participant.displayName,
           avatar: participant.avatar,
-        });
+        }).catch(() => {});
       } catch (e) {}
     }
     this.sendWsMessage('HEARTBEAT', { roomId, participant });
@@ -269,8 +323,8 @@ class JamRepository {
   public async transferHost(roomId: string, newHostId: string) {
     if (rtdb) {
       try {
-        await update(ref(rtdb, `jams/${roomId}/metadata`), { hostId: newHostId });
-        await update(ref(rtdb, `jams/${roomId}/participants/${newHostId}`), { role: 'host' });
+        update(ref(rtdb, `jams/${roomId}/metadata`), { hostId: newHostId }).catch(() => {});
+        update(ref(rtdb, `jams/${roomId}/participants/${newHostId}`), { role: 'host' }).catch(() => {});
       } catch (e) {}
     }
     this.sendWsMessage('TRANSFER_HOST', { roomId, newHostId });
@@ -282,7 +336,7 @@ class JamRepository {
   public async endRoom(roomId: string) {
     if (rtdb) {
       try {
-        await update(ref(rtdb, `jams/${roomId}/metadata`), { active: false });
+        update(ref(rtdb, `jams/${roomId}/metadata`), { active: false }).catch(() => {});
       } catch (e) {}
     }
     this.sendWsMessage('END_ROOM', { roomId });
@@ -297,14 +351,18 @@ class JamRepository {
       const historyRef = doc(collection(db, 'jamHistory'), summary.roomId);
       await setDoc(historyRef, summary);
     } catch (e) {
-      console.warn('JamRepository: Firestore summary save skipped:', e);
+      console.warn('JamRepository: Firestore summary save notice:', e);
     }
   }
 
-  // --- WebSocket Fallback Subsystem ---
+  // --- WebSocket Subsystem ---
   private initWebSocket(roomId: string, onUpdate: (state: JamRoomState) => void) {
     if (typeof window === 'undefined') return;
     this.closeWebSocket();
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/jam`;
@@ -313,25 +371,53 @@ class JamRepository {
       this.activeWs = new WebSocket(wsUrl);
 
       this.activeWs.onopen = () => {
-        this.activeWs?.send(JSON.stringify({ type: 'jam:room_subscribe', data: { roomId } }));
+        if (this.activeWs?.readyState === WebSocket.OPEN) {
+          this.activeWs.send(JSON.stringify({ type: 'jam:room_subscribe', data: { roomId } }));
+        }
       };
 
       this.activeWs.onmessage = (e) => {
         try {
           const msg = JSON.parse(e.data);
           if (msg.type === 'jam:room_state' && msg.data?.state) {
-            onUpdate(msg.data.state);
+            const state = msg.data.state as JamRoomState;
+            try {
+              localStorage.setItem(`aura_jam_room_${roomId}`, JSON.stringify(state));
+            } catch (err) {}
+            onUpdate(state);
           }
         } catch (err) {}
       };
-    } catch (e) {}
+
+      this.activeWs.onclose = () => {
+        if (this.activeRoomId === roomId) {
+          this.reconnectTimeout = setTimeout(() => {
+            if (this.activeRoomId === roomId) {
+              this.initWebSocket(roomId, onUpdate);
+            }
+          }, 3000);
+        }
+      };
+
+      this.activeWs.onerror = () => {
+        // Handled via onclose
+      };
+    } catch (e) {
+      console.warn('JamRepository WebSocket init error:', e);
+    }
   }
 
   private sendWsMessage(type: string, data: any) {
+    let sent = false;
     if (this.activeWs && this.activeWs.readyState === WebSocket.OPEN) {
-      this.activeWs.send(JSON.stringify({ type: `jam:${type.toLowerCase()}`, data }));
-    } else {
-      // Also post action to REST endpoint
+      try {
+        this.activeWs.send(JSON.stringify({ type: `jam:${type.toLowerCase()}`, data }));
+        sent = true;
+      } catch (e) {}
+    }
+
+    // Always ensure server processes the action even if WebSocket is buffering or reconnecting
+    if (!sent) {
       fetch('/api/jam/room-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -341,6 +427,10 @@ class JamRepository {
   }
 
   private closeWebSocket() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     if (this.activeWs) {
       try {
         this.activeWs.close();

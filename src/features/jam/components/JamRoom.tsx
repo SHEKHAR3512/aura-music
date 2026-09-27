@@ -10,6 +10,7 @@ import {
   Maximize2,
   X,
   Radio,
+  Plus,
 } from 'lucide-react';
 import { useJamStore } from '../store/useJamStore';
 import { JamHeader } from './JamHeader';
@@ -38,7 +39,7 @@ export const JamRoom: React.FC = () => {
   if (!jamRoom) return null;
 
   return (
-    <div className="relative w-full min-h-[calc(100vh-5rem)] flex flex-col rounded-3xl bg-[#090b12]/90 border border-white/10 shadow-2xl backdrop-blur-3xl overflow-hidden p-4 sm:p-6 mb-20 animate-fadeIn">
+    <div className="relative w-full min-h-[calc(100dvh-4rem)] flex flex-col rounded-2xl sm:rounded-3xl bg-[#090b12]/90 border border-white/10 shadow-2xl backdrop-blur-3xl overflow-hidden p-3.5 sm:p-6 mb-4 sm:mb-8 animate-fadeIn">
       {/* Background Dynamic Ambient Radial Glow */}
       <div
         className="absolute -top-32 -left-32 w-96 h-96 rounded-full blur-[120px] pointer-events-none opacity-40 transition-all duration-1000"
@@ -129,9 +130,10 @@ export const JamRoom: React.FC = () => {
       </div>
 
       {/* Mobile Responsive Layout */}
-      <div className="lg:hidden flex flex-col space-y-5 mt-4">
-        {/* Mobile Navigation Segment Control */}
-        <div className="flex items-center justify-between p-1 rounded-full bg-white/5 border border-white/10 text-xs overflow-x-auto no-scrollbar">
+      <div className="lg:hidden flex flex-col space-y-4 mt-4">
+        {/* Mobile Navigation Segment Control & Quick Add Button */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 flex items-center justify-between p-1 rounded-full bg-white/5 border border-white/10 text-xs overflow-x-auto no-scrollbar">
           <button
             onClick={() => setMobileTab('now_playing')}
             className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
@@ -171,6 +173,17 @@ export const JamRoom: React.FC = () => {
             }`}
           >
             Activity
+          </button>
+        </div>
+
+          {/* Quick Add Song Action Button */}
+          <button
+            onClick={() => setSearchModalOpen(true)}
+            className="flex items-center gap-1 px-3 py-2 rounded-full bg-[var(--aura-primary,#6366f1)] hover:bg-[var(--aura-primary,#6366f1)]/90 text-white text-xs font-bold shrink-0 shadow-md cursor-pointer transition-transform active:scale-95"
+            title="Search and add songs to Jam"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden xs:inline">Add</span>
           </button>
         </div>
 

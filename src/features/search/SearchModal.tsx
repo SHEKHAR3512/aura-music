@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, X, Play, Music, User, Disc, ListMusic, ArrowRight, CornerDownLeft, Plus } from 'lucide-react';
+import { Search, X, Play, Music, User, Disc, ListMusic, ArrowRight, CornerDownLeft, Plus, Check } from 'lucide-react';
 import { usePlayerStore } from '../../stores/playerStore';
-import { useJamStore } from '../../lib/jam/jamStore';
+import { useJamStore } from '../jam/store/useJamStore';
 import { Song, Album, Artist, Playlist, SearchResults } from '../../lib/music/types';
 
 interface SearchModalProps {
@@ -13,10 +13,11 @@ interface SearchModalProps {
 
 export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSelectAlbum, onSelectPlaylist }) => {
   const { searchModalOpen, setSearchModalOpen, playTrack, currentTrack, setJamModalOpen } = usePlayerStore();
-  const { session: jamSession, broadcastAddToQueue } = useJamStore();
+  const { room: jamRoom, playTrack: playJamTrack, addToQueue: addJamQueue } = useJamStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [queuedSongIds, setQueuedSongIds] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Debounce search by 300ms
@@ -84,12 +85,11 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
 
   if (!searchModalOpen) return null;
 
-  // If a Jam session is active, add songs to the Jam queue instead of playing locally
+  // If a Jam session is active, broadcast song to the Jam session
   const handleSongSelect = (song: Song) => {
-    if (jamSession) {
-      broadcastAddToQueue(song);
+    if (jamRoom) {
+      playJamTrack(song);
       setSearchModalOpen(false);
-      setJamModalOpen(true); // Re-open Jam modal to see the queue
     } else {
       playTrack(song);
       setSearchModalOpen(false);
@@ -101,10 +101,10 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
       role="dialog"
       aria-modal="true"
       aria-label="Universal Music Search"
-      className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/80 backdrop-blur-xl animate-fadeIn"
+      className="fixed inset-0 z-[80] flex items-start justify-center pt-10 sm:pt-20 px-3 sm:px-4 bg-black/85 backdrop-blur-xl animate-fadeIn"
     >
       <div 
-        className="relative w-full max-w-2xl bg-[#0f111a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col max-h-[80vh]"
+        className="relative w-full max-w-2xl bg-[#0f111a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col max-h-[85vh]"
         style={{
           boxShadow: '0 25px 60px -15px var(--aura-glow, rgba(0,0,0,0.7))',
         }}
@@ -147,13 +147,14 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
           {!isLoading && songs.length > 0 && (
             <div>
               <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
-                <span>{jamSession ? 'Tap to add to Jam queue' : 'Songs'} ({songs.length})</span>
-                <span className="text-[10px] text-slate-500 hidden sm:inline">{jamSession ? 'Adds to car queue' : 'Use ↑ ↓ and Enter to play'}</span>
+                <span>{jamRoom ? 'Jam Active • Tap to play in room' : 'Songs'} ({songs.length})</span>
+                <span className="text-[10px] text-slate-500 hidden sm:inline">{jamRoom ? 'Click song to play • + to queue' : 'Use ↑ ↓ and Enter to play'}</span>
               </div>
               <div className="space-y-1">
                 {songs.map((song, i) => {
                   const isSelected = i === selectedIndex;
                   const isCurrent = currentTrack?.id === song.id;
+                  const isQueued = queuedSongIds.has(song.id);
                   return (
                     <div
                       key={`${song.id}-${i}`}
@@ -187,15 +188,47 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
                         </div>
                       </div>
 
-                      {isSelected && (
-                        <div className="hidden sm:flex items-center gap-1 text-[11px] text-[var(--aura-primary,#6366f1)] font-mono pr-2">
-                          {jamSession ? (
-                            <><Plus className="w-3.5 h-3.5" /><span>Add</span></>
-                          ) : (
-                            <><CornerDownLeft className="w-3.5 h-3.5" /><span>Play</span></>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {jamRoom && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addJamQueue(song);
+                              setQueuedSongIds(prev => new Set(prev).add(song.id));
+                              setTimeout(() => {
+                                setQueuedSongIds(prev => {
+                                  const next = new Set(prev);
+                                  next.delete(song.id);
+                                  return next;
+                                });
+                              }, 2000);
+                            }}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              isQueued 
+                                ? 'text-emerald-400 bg-emerald-500/20' 
+                                : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10'
+                            }`}
+                            title={isQueued ? "Added to Jam Queue!" : "Add to Jam Queue"}
+                          >
+                            {isQueued ? (
+                              <Check className="w-4 h-4 text-emerald-400" />
+                            ) : (
+                              <Plus className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+
+                        {isSelected && (
+                          <div className="hidden sm:flex items-center gap-1 text-[11px] text-[var(--aura-primary,#6366f1)] font-mono pr-2">
+                            {jamRoom ? (
+                              <><Play className="w-3.5 h-3.5 fill-current" /><span>Play Jam</span></>
+                            ) : (
+                              <><CornerDownLeft className="w-3.5 h-3.5" /><span>Play</span></>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

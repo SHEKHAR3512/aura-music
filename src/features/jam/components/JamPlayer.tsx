@@ -8,15 +8,30 @@ import {
   VolumeX,
   Sparkles,
   User,
+  Smartphone,
+  Plus,
+  Music,
 } from 'lucide-react';
 import { useJamStore } from '../store/useJamStore';
+import { usePlayerStore } from '../../../stores/playerStore';
 import { jamSyncEngine } from '../sync/JamSyncEngine';
 import { formatTimeRemaining } from '../utils/jamUtils';
 import { audioEngine } from '../../../lib/audio/AudioEngine';
 import { JamReactions } from './JamReactions';
 
 export const JamPlayer: React.FC = () => {
-  const { room, userId, play, pause, seek, next, previous } = useJamStore();
+  const { setSearchModalOpen } = usePlayerStore();
+  const {
+    room,
+    userId,
+    isAudioOutput,
+    toggleAudioOutput,
+    play,
+    pause,
+    seek,
+    next,
+    previous,
+  } = useJamStore();
 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -75,10 +90,24 @@ export const JamPlayer: React.FC = () => {
 
   if (!track) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-center text-slate-500 space-y-3">
-        <Sparkles className="w-12 h-12 text-slate-600 animate-pulse" />
-        <h4 className="text-sm font-semibold text-slate-400">Waiting for track selection...</h4>
-        <p className="text-xs text-slate-600">The room is ready. Choose a track from the queue.</p>
+      <div className="flex flex-col items-center justify-center p-8 sm:p-12 text-center text-slate-500 space-y-4 max-w-sm mx-auto animate-fadeIn">
+        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-indigo-400 shadow-xl">
+          <Music className="w-8 h-8 animate-pulse" />
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-base font-bold text-white tracking-tight">No Song Playing Yet</h4>
+          <p className="text-xs text-slate-400">
+            The Jam room is live and ready! Search and add songs to start synchronized listening with your friends.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setSearchModalOpen(true)}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[var(--aura-primary,#6366f1)] hover:brightness-110 active:scale-95 text-white font-bold text-sm shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Songs to Jam</span>
+        </button>
       </div>
     );
   }
@@ -123,6 +152,43 @@ export const JamPlayer: React.FC = () => {
           <User className="w-2.5 h-2.5 text-[var(--aura-primary,#6366f1)]" />
           <span>Synchronized in Jam</span>
         </div>
+      </div>
+
+      {/* Audio Output Mode (Speaker vs Remote Controller) */}
+      <div className="w-full max-w-md px-3.5 py-2 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-3 shadow-inner">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {isAudioOutput ? (
+            <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <Volume2 className="w-3.5 h-3.5" />
+            </div>
+          ) : (
+            <div className="w-7 h-7 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+              <Smartphone className="w-3.5 h-3.5" />
+            </div>
+          )}
+          <div className="text-left min-w-0">
+            <p className="text-xs font-bold text-white truncate">
+              {isAudioOutput ? 'Speaker Mode' : 'Remote Controller Mode'}
+            </p>
+            <p className="text-[10px] text-slate-400 truncate">
+              {isAudioOutput
+                ? 'Audio is playing on this device'
+                : 'Muted here • Playing on Host / Laptop'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={toggleAudioOutput}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            isAudioOutput
+              ? 'bg-white/10 hover:bg-white/15 text-slate-300 border border-white/10'
+              : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20'
+          }`}
+        >
+          {isAudioOutput ? 'Mute This Phone' : '🔊 Listen on Phone'}
+        </button>
       </div>
 
       {/* Synchronized Live Scrubber */}
@@ -191,31 +257,48 @@ export const JamPlayer: React.FC = () => {
         </button>
       </div>
 
-      {/* Local Volume Slider (Client personal audio, not synchronized) */}
-      <div className="flex items-center gap-2 max-w-[200px] w-full text-slate-400">
-        <button
-          onClick={handleToggleVolumeMute}
-          aria-label="Toggle mute"
-          className="p-1 hover:text-white transition-colors cursor-pointer"
-        >
-          {isMuted || volume === 0 ? (
-            <VolumeX className="w-4 h-4 text-rose-400" />
-          ) : (
-            <Volume2 className="w-4 h-4" />
-          )}
-        </button>
+      {/* Quick Add Songs to Jam Queue Button */}
+      <button
+        type="button"
+        onClick={() => setSearchModalOpen(true)}
+        className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 hover:text-white transition-all cursor-pointer shadow-sm hover:border-white/20"
+      >
+        <Plus className="w-3.5 h-3.5 text-[var(--aura-primary,#6366f1)]" />
+        <span>Add Song to Jam</span>
+      </button>
 
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={isMuted ? 0 : volume}
-          onChange={handleVolumeChange}
-          aria-label="Local playback volume"
-          className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer focus:outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-        />
-      </div>
+      {/* Local Volume Slider or Remote Mode Note */}
+      {isAudioOutput ? (
+        <div className="flex items-center gap-2 max-w-[200px] w-full text-slate-400">
+          <button
+            onClick={handleToggleVolumeMute}
+            aria-label="Toggle mute"
+            className="p-1 hover:text-white transition-colors cursor-pointer"
+          >
+            {isMuted || volume === 0 ? (
+              <VolumeX className="w-4 h-4 text-rose-400" />
+            ) : (
+              <Volume2 className="w-4 h-4" />
+            )}
+          </button>
+
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={isMuted ? 0 : volume}
+            onChange={handleVolumeChange}
+            aria-label="Local playback volume"
+            className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer focus:outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+          />
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 text-[11px] text-sky-400/80 font-mono">
+          <Smartphone className="w-3.5 h-3.5" />
+          <span>Silent Controller • Tap "Listen on Phone" for sound</span>
+        </div>
+      )}
     </div>
   );
 };

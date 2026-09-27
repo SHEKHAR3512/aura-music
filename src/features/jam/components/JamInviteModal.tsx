@@ -19,6 +19,16 @@ export const JamInviteModal: React.FC = () => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [networkOrigin, setNetworkOrigin] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/system/info')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.url) setNetworkOrigin(d.url);
+      })
+      .catch(() => {});
+  }, [isInviteModalOpen]);
 
   const shareUrl = room ? getJamShareUrl(room.metadata.id, room.metadata.inviteToken) : '';
   const participants = Object.values(room?.participants || {});
@@ -42,7 +52,7 @@ export const JamInviteModal: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [shareUrl]);
+  }, [shareUrl, networkOrigin]);
 
   if (!isInviteModalOpen || !room) return null;
 
@@ -128,6 +138,14 @@ export const JamInviteModal: React.FC = () => {
               {participants.length} listener{participants.length === 1 ? '' : 's'} in this room
             </span>
           </div>
+
+          {networkOrigin && (
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 bg-white/[0.04] py-1 px-3 rounded-full border border-white/10 mx-auto w-fit mt-1">
+              <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
+              <span>iPhone LAN:</span>
+              <span className="font-mono text-white font-semibold select-all">{networkOrigin}</span>
+            </div>
+          )}
         </div>
 
         {/* Center QR Code */}

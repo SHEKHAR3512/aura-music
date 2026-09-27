@@ -7,15 +7,22 @@ import {
   Sparkles,
   Bug,
   Crown,
+  Volume2,
+  Smartphone,
+  Plus,
 } from 'lucide-react';
 import { useJamStore } from '../store/useJamStore';
+import { usePlayerStore } from '../../../stores/playerStore';
 import { JamConnectionStatus } from './JamConnectionStatus';
 import { JAM_MODE_CONFIGS } from '../recommendations/JamModeConfig';
 
 export const JamHeader: React.FC = () => {
+  const { setSearchModalOpen } = usePlayerStore();
   const {
     room,
     userId,
+    isAudioOutput,
+    toggleAudioOutput,
     leaveJam,
     endJam,
     setIsInviteModalOpen,
@@ -86,6 +93,43 @@ export const JamHeader: React.FC = () => {
 
         {/* Live Synchronization Status Badge */}
         <JamConnectionStatus />
+
+        {/* Audio Output Mode Quick Toggle */}
+        <button
+          onClick={toggleAudioOutput}
+          title={
+            isAudioOutput
+              ? 'Click to switch to Remote Controller mode (silent on this device)'
+              : 'Click to listen on this device (Speaker mode)'
+          }
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+            isAudioOutput
+              ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+              : 'bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border-sky-500/30'
+          }`}
+        >
+          {isAudioOutput ? (
+            <>
+              <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Speaker</span>
+            </>
+          ) : (
+            <>
+              <Smartphone className="w-3.5 h-3.5 text-sky-400" />
+              <span className="hidden sm:inline">Controller</span>
+            </>
+          )}
+        </button>
+
+        {/* Add Songs Quick Trigger */}
+        <button
+          onClick={() => setSearchModalOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--aura-primary,#6366f1)] hover:bg-[var(--aura-primary,#6366f1)]/90 text-white text-xs font-bold shadow-md transition-colors cursor-pointer"
+          title="Search and add songs to Jam"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Add Songs</span>
+        </button>
 
         {/* Invite Button */}
         <button
