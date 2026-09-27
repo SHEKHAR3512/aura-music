@@ -3,6 +3,7 @@ import { Zap, Radio, Sliders, Car, Sparkles, Check } from 'lucide-react';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useJamStore } from '../jam/store/useJamStore';
 import { triggerHaptic } from '../../lib/utils/haptics';
+import { log } from 'console';
 
 interface CrossfadeSettingSliderProps {
   compact?: boolean;
@@ -17,7 +18,7 @@ const CROSSFADE_PRESETS = [
   { seconds: 8, label: '8s', desc: 'Club' },
   { seconds: 12, label: '12s', desc: 'Max DJ' },
 ];
-
+console.log("test")
 export const CrossfadeSettingSlider: React.FC<CrossfadeSettingSliderProps> = ({
   compact = false,
   showEnvelopeVisual = true,
@@ -46,19 +47,17 @@ export const CrossfadeSettingSlider: React.FC<CrossfadeSettingSliderProps> = ({
   };
 
   return (
-    <div className={`rounded-2xl border transition-all ${
-      inJamSessionModal 
-        ? 'bg-gradient-to-r from-emerald-950/20 via-black/40 to-black/40 border-emerald-500/25 p-4 sm:p-5' 
-        : 'bg-white/[0.04] border-white/10 p-4 sm:p-5'
-    }`}>
+    <div className={`rounded-2xl border transition-all ${inJamSessionModal
+      ? 'bg-gradient-to-r from-emerald-950/20 via-black/40 to-black/40 border-emerald-500/25 p-4 sm:p-5'
+      : 'bg-white/[0.04] border-white/10 p-4 sm:p-5'
+      }`}>
       {/* Header with Title and Current Duration */}
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-            inJamSessionModal 
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-              : 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
-          }`}>
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${inJamSessionModal
+            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+            : 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+            }`}>
             <Zap className="w-4 h-4" />
           </div>
           <div className="min-w-0">
@@ -100,11 +99,9 @@ export const CrossfadeSettingSlider: React.FC<CrossfadeSettingSliderProps> = ({
             aria-label="Crossfade transition duration in seconds"
             className="w-full h-2 rounded-lg bg-black/50 accent-emerald-400 cursor-pointer appearance-none border border-white/10"
             style={{
-              background: `linear-gradient(to right, ${
-                inJamSessionModal ? '#10b981' : '#6366f1'
-              } 0%, ${
-                inJamSessionModal ? '#10b981' : '#6366f1'
-              } ${(crossfadeSeconds / 12) * 100}%, rgba(255,255,255,0.1) ${(crossfadeSeconds / 12) * 100}%, rgba(255,255,255,0.1) 100%)`
+              background: `linear-gradient(to right, ${inJamSessionModal ? '#10b981' : '#6366f1'
+                } 0%, ${inJamSessionModal ? '#10b981' : '#6366f1'
+                } ${(crossfadeSeconds / 12) * 100}%, rgba(255,255,255,0.1) ${(crossfadeSeconds / 12) * 100}%, rgba(255,255,255,0.1) 100%)`
             }}
           />
         </div>
@@ -158,13 +155,13 @@ export const CrossfadeSettingSlider: React.FC<CrossfadeSettingSliderProps> = ({
                 </defs>
 
                 {/* Overlap background shading */}
-                <rect 
-                  x={150 - (crossfadeSeconds / 12) * 110} 
-                  y="2" 
-                  width={(crossfadeSeconds / 12) * 220} 
-                  height="36" 
-                  fill="rgba(16, 185, 129, 0.08)" 
-                  rx="4" 
+                <rect
+                  x={150 - (crossfadeSeconds / 12) * 110}
+                  y="2"
+                  width={(crossfadeSeconds / 12) * 220}
+                  height="36"
+                  fill="rgba(16, 185, 129, 0.08)"
+                  rx="4"
                 />
 
                 {/* Curve A (Fade Out) */}
@@ -202,13 +199,12 @@ export const CrossfadeSettingSlider: React.FC<CrossfadeSettingSliderProps> = ({
               key={p.seconds}
               type="button"
               onClick={() => handlePresetClick(p.seconds)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer shrink-0 border ${
-                isSelected
-                  ? inJamSessionModal
-                    ? 'bg-emerald-500 text-slate-950 font-bold border-emerald-400 shadow-sm'
-                    : 'bg-white text-slate-950 font-bold border-white shadow-sm'
-                  : 'bg-white/5 hover:bg-white/10 active:bg-white/15 text-slate-300 border-white/5'
-              }`}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer shrink-0 border ${isSelected
+                ? inJamSessionModal
+                  ? 'bg-emerald-500 text-slate-950 font-bold border-emerald-400 shadow-sm'
+                  : 'bg-white text-slate-950 font-bold border-white shadow-sm'
+                : 'bg-white/5 hover:bg-white/10 active:bg-white/15 text-slate-300 border-white/5'
+                }`}
             >
               <span>{p.label}</span>
               <span className="text-[9px] opacity-75 ml-1 font-mono">{p.desc}</span>
