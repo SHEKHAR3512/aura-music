@@ -3,7 +3,6 @@ import { Zap, Radio, Sliders, Car, Sparkles, Check } from 'lucide-react';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useJamStore } from '../jam/store/useJamStore';
 import { triggerHaptic } from '../../lib/utils/haptics';
-import { log } from 'console';
 
 interface CrossfadeSettingSliderProps {
   compact?: boolean;
@@ -18,7 +17,7 @@ const CROSSFADE_PRESETS = [
   { seconds: 8, label: '8s', desc: 'Club' },
   { seconds: 12, label: '12s', desc: 'Max DJ' },
 ];
-console.log("test")
+
 export const CrossfadeSettingSlider: React.FC<CrossfadeSettingSliderProps> = ({
   compact = false,
   showEnvelopeVisual = true,
