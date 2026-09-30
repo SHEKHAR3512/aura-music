@@ -4,6 +4,7 @@ dotenv.config();
 import express, { Request, Response } from 'express';
 import http from 'http';
 import path from 'path';
+import fs from 'fs';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
@@ -675,7 +676,21 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, 'dist');
+    // When bundled to dist/server.js, __dirname is already the 'dist' directory.
+    // If running server.ts directly from root, 'dist' is a subdirectory.
+    let distPath = path.basename(__dirname) === 'dist'
+      ? __dirname
+      : path.resolve(process.cwd(), 'dist');
+
+    if (!fs.existsSync(path.resolve(distPath, 'index.html'))) {
+      if (fs.existsSync(path.resolve(process.cwd(), 'dist/index.html'))) {
+        distPath = path.resolve(process.cwd(), 'dist');
+      } else if (fs.existsSync(path.resolve(__dirname, 'index.html'))) {
+        distPath = __dirname;
+      }
+    }
+
+    console.log(`  📁 Static assets directory: ${distPath}`);
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.resolve(distPath, 'index.html'));
