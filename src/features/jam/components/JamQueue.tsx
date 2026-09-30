@@ -30,6 +30,7 @@ import { useJamStore } from '../store/useJamStore';
 import { JamQueueItem } from '../types/jam.types';
 import { GroupRecommendationEngine, GroupRecommendation } from '../recommendations/GroupRecommendationEngine';
 import { Song } from '../../../lib/music/types';
+import { isParticipantOnline } from '../services/JamPresenceService';
 
 interface SortableQueueItemProps {
   item: JamQueueItem;
@@ -186,7 +187,7 @@ export const JamQueue: React.FC<{ onOpenSearch?: () => void }> = ({ onOpenSearch
     setTimeout(() => setVoted(false), 3000);
   };
 
-  const onlineCount = Object.values(room?.participants || {}).filter((p) => p.isOnline).length;
+  const onlineCount = Object.values(room?.participants || {}).filter(isParticipantOnline).length;
   const votesNeeded = Math.ceil((Math.max(1, onlineCount) * (room?.settings.voteSkipThresholdPercent || 50)) / 100);
   const currentVotes = room?.skipVotes?.length || 0;
 

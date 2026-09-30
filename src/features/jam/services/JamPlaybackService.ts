@@ -112,7 +112,11 @@ export class JamPlaybackService {
     newQueue?: Song[]
   ) {
     const isHost = state.metadata.hostId === actorId;
-    if (!isHost && !state.settings.allowGuestSkip) {
+    const isSystemOrVote =
+      actorId === 'system' ||
+      actorName.toLowerCase().includes('vote') ||
+      actorName.toLowerCase().includes('skip');
+    if (!isHost && !isSystemOrVote && !state.settings.allowGuestSkip) {
       throw new Error('Guests do not have permission to change tracks directly.');
     }
 

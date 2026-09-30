@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { DriftCorrection } from '../sync/DriftCorrection';
 import { SYNC_CONFIG } from '../sync/SyncConfig';
-import { JamPresenceService } from '../services/JamPresenceService';
+import { JamPresenceService, isParticipantOnline } from '../services/JamPresenceService';
+import { JamPlaybackService } from '../services/JamPlaybackService';
 import { RoomDNAEngine } from '../recommendations/RoomDNAEngine';
 import { JamRoomState } from '../types/jam.types';
 import { Song } from '../../../lib/music/types';
@@ -200,6 +201,46 @@ async function runJamTests() {
     assert(dna.energy === 'HIGH', 'Party mode sets DNA energy to HIGH');
     assert(dna.languages.some((l) => l.language === 'Hindi'), 'Room DNA identifies Hindi language dominance');
     assert(dna.topArtists[0] === 'Arijit Singh', 'Top artist correctly identified as Arijit Singh');
+  }
+
+  // TEST 10: Accurate Online Presence Filtering
+  console.log('\nTest 10: Accurate Online Presence Filtering');
+  {
+    const now = Date.now();
+    const mockParticipants = {
+      'user-active-1': { id: 'user-active-1', displayName: 'User 1', avatar: '', role: 'host' as const, isOnline: true, joinedAt: now - 60000, lastSeen: now - 5000 },
+      'user-active-2': { id: 'user-active-2', displayName: 'User 2', avatar: '', role: 'guest' as const, isOnline: true, joinedAt: now - 40000, lastSeen: now - 10000 },
+      'user-stale-ghost': { id: 'user-stale-ghost', displayName: 'Stale Ghost', avatar: '', role: 'guest' as const, isOnline: true, joinedAt: now - 3600000, lastSeen: now - 600000 },
+    };
+
+    const onlineMembers = Object.values(mockParticipants).filter(isParticipantOnline);
+    assert(onlineMembers.length === 2, 'Accurately filters out ghost participants whose heartbeat expired');
+  }
+
+  // TEST 11: Vote to Skip Permission Bypasses allowGuestSkip for System / Vote Actions
+  console.log('\nTest 11: Vote to Skip Track Transition');
+  {
+    const mockState: JamRoomState = {
+      metadata: { id: 'RM1', name: 'R1', hostId: 'host-1', createdAt: 0, expiresAt: 10000, privacy: 'public_link', mode: 'chill', inviteToken: '', active: true },
+      playback: { trackId: 'song-1', track: null, isPlaying: true, position: 10, playbackStartedAt: 0, playbackVersion: 1, updatedAt: 0, updatedBy: 'host-1' },
+      queue: [],
+      participants: {},
+      settings: { allowGuestQueue: true, allowGuestReorder: true, allowGuestSkip: false, allowGuestPause: false, allowGuestSeek: false, allowGuestVolume: true, allowReactions: true, allowRecommendations: true, voteSkipThresholdPercent: 50 },
+      reactions: [],
+      activity: [],
+      songRequests: [],
+      skipVotes: [],
+      sequenceNumber: 1,
+      serverTimestamp: 0,
+    };
+
+    let threw = false;
+    try {
+      await JamPlaybackService.changeTrack(mockState, 'system', 'Vote to Skip', { id: 'song-2', title: 'Next Song', primaryArtist: 'Artist', artwork: {} } as any);
+    } catch (e) {
+      threw = true;
+    }
+    assert(!threw, 'Vote to Skip (system action) succeeds even when allowGuestSkip is false');
   }
 
   console.log('\n--- ALL JAM REALTIME ENGINE TESTS PASSED! ---\n');

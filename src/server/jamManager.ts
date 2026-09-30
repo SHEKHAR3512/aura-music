@@ -44,6 +44,7 @@ export interface ClientSocket extends WebSocket {
   deviceId?: string;
   sessionId?: string;
   roomId?: string;
+  participantId?: string;
   isAlive?: boolean;
 }
 
@@ -53,7 +54,7 @@ class JamSessionManager {
   private roomSockets = new Map<string, Set<ClientSocket>>(); // roomId -> Set of sockets
   private nextGenRooms = new Map<string, JamRoomState>();
   private wss: WebSocketServer | null = null;
-
+  private presenceSweepInterval: any = null;
 
   public init(server: Server) {
     this.seedDefaultRooms();
@@ -79,7 +80,7 @@ class JamSessionManager {
       });
     });
 
-    // Heartbeat cleanup every 30s
+    // Heartbeat ping cleanup every 30s
     setInterval(() => {
       if (!this.wss) return;
       this.wss.clients.forEach((client) => {
@@ -89,6 +90,12 @@ class JamSessionManager {
         c.ping();
       });
     }, 30000);
+
+    // Active presence detection & room memory eviction sweeper every 15s
+    if (this.presenceSweepInterval) clearInterval(this.presenceSweepInterval);
+    this.presenceSweepInterval = setInterval(() => {
+      this.sweepPresenceAndMemory();
+    }, 15000);
   }
 
   private handleClientMessage(ws: ClientSocket, message: any) {
@@ -356,6 +363,9 @@ class JamSessionManager {
         const roomId = data?.roomId?.toUpperCase();
         if (roomId) {
           ws.roomId = roomId;
+          if (data?.participantId || data?.deviceId) {
+            ws.participantId = data.participantId || data.deviceId;
+          }
           this.addSocketToRoom(roomId, ws);
           const roomState = this.nextGenRooms.get(roomId);
           if (roomState) {
@@ -381,7 +391,22 @@ class JamSessionManager {
         const { roomId, item, queue } = data || {};
         const room = this.nextGenRooms.get(roomId?.toUpperCase());
         if (room) {
-          room.queue = queue || [...room.queue, item];
+          if (Array.isArray(queue)) {
+            // Deduplicate incoming queue by track ID
+            const seen = new Set<string>();
+            room.queue = queue.filter((q: any) => {
+              const tid = q?.track?.id || q?.id;
+              if (!tid || seen.has(tid)) return false;
+              seen.add(tid);
+              return true;
+            });
+          } else if (item) {
+            const trackId = item.track?.id || item.id;
+            const alreadyExists = room.queue.some((q) => (q.track?.id || q.id) === trackId);
+            if (!alreadyExists) {
+              room.queue = [...room.queue, item];
+            }
+          }
           room.serverTimestamp = Date.now();
           this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
         }
@@ -391,8 +416,15 @@ class JamSessionManager {
       case 'jam:queue_set': {
         const { roomId, queue } = data || {};
         const room = this.nextGenRooms.get(roomId?.toUpperCase());
-        if (room && queue) {
-          room.queue = queue;
+        if (room && Array.isArray(queue)) {
+          // Deduplicate queue items by track ID to avoid duplicate song confusion
+          const seen = new Set<string>();
+          room.queue = queue.filter((q: any) => {
+            const tid = q?.track?.id || q?.id;
+            if (!tid || seen.has(tid)) return false;
+            seen.add(tid);
+            return true;
+          });
           room.serverTimestamp = Date.now();
           this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
         }
@@ -403,7 +435,7 @@ class JamSessionManager {
         const { roomId, reaction } = data || {};
         const room = this.nextGenRooms.get(roomId?.toUpperCase());
         if (room && reaction) {
-          room.reactions = [...room.reactions.slice(-30), reaction];
+          room.reactions = [...room.reactions.slice(-20), reaction];
           room.serverTimestamp = Date.now();
           this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
         }
@@ -414,7 +446,7 @@ class JamSessionManager {
         const { roomId, event } = data || {};
         const room = this.nextGenRooms.get(roomId?.toUpperCase());
         if (room && event) {
-          room.activity = [event, ...room.activity.slice(0, 49)];
+          room.activity = [event, ...room.activity.slice(0, 29)];
           room.serverTimestamp = Date.now();
           this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
         }
@@ -447,6 +479,7 @@ class JamSessionManager {
         const { roomId, participant } = data || {};
         const room = this.nextGenRooms.get(roomId?.toUpperCase());
         if (room && participant) {
+          ws.participantId = participant.id;
           room.participants[participant.id] = {
             ...room.participants[participant.id],
             ...participant,
@@ -455,6 +488,20 @@ class JamSessionManager {
           };
           room.serverTimestamp = Date.now();
           this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+        }
+        break;
+      }
+
+      case 'jam:room_leave': {
+        const { roomId, participantId } = data || {};
+        const cleanRoomId = (roomId || ws.roomId)?.toUpperCase();
+        const pId = participantId || ws.participantId;
+        const room = cleanRoomId ? this.nextGenRooms.get(cleanRoomId) : undefined;
+        if (room && pId && room.participants[pId]) {
+          room.participants[pId].isOnline = false;
+          room.participants[pId].lastSeen = Date.now();
+          room.serverTimestamp = Date.now();
+          this.broadcastToRoom(cleanRoomId, 'jam:room_state', { state: room });
         }
         break;
       }
@@ -614,12 +661,106 @@ class JamSessionManager {
     }
 
     if (ws.roomId) {
-      const rSockets = this.roomSockets.get(ws.roomId.toUpperCase());
+      const cleanRoomId = ws.roomId.toUpperCase();
+      const rSockets = this.roomSockets.get(cleanRoomId);
       if (rSockets) {
         rSockets.delete(ws);
         if (rSockets.size === 0) {
-          this.roomSockets.delete(ws.roomId.toUpperCase());
+          this.roomSockets.delete(cleanRoomId);
         }
+      }
+
+      // If we know which participant was on this socket, check if any other open sockets remain
+      const pId = ws.participantId || ws.deviceId;
+      if (pId) {
+        const room = this.nextGenRooms.get(cleanRoomId);
+        if (room && room.participants && room.participants[pId]) {
+          let hasOtherSocket = false;
+          if (rSockets) {
+            for (const sock of rSockets) {
+              if (
+                (sock.participantId === pId || sock.deviceId === pId) &&
+                sock.readyState === WebSocket.OPEN
+              ) {
+                hasOtherSocket = true;
+                break;
+              }
+            }
+          }
+
+          if (!hasOtherSocket) {
+            room.participants[pId].isOnline = false;
+            room.participants[pId].lastSeen = Date.now();
+            room.serverTimestamp = Date.now();
+            this.broadcastToRoom(cleanRoomId, 'jam:room_state', { state: room });
+          }
+        }
+      }
+    }
+  }
+
+  public sweepPresenceAndMemory() {
+    const now = Date.now();
+
+    // 1. Sweep Next-Gen Listening Rooms
+    for (const [roomId, room] of this.nextGenRooms.entries()) {
+      let roomUpdated = false;
+      const isCurated = roomId === 'CHILL1' || roomId === 'HIT88';
+
+      // Check participants: mark offline if inactive > 30s
+      if (room.participants) {
+        for (const [pId, p] of Object.entries(room.participants)) {
+          if (p.isOnline && now - (p.lastSeen || 0) > 30000) {
+            p.isOnline = false;
+            roomUpdated = true;
+          }
+
+          // Prune offline guest participants older than 30 minutes to prevent memory leak
+          if (!p.isOnline && pId !== room.metadata.hostId && now - (p.lastSeen || 0) > 30 * 60 * 1000) {
+            delete room.participants[pId];
+            roomUpdated = true;
+          }
+        }
+      }
+
+      // Memory bounds: prune reactions and activity
+      if (room.reactions && room.reactions.length > 20) {
+        room.reactions = room.reactions.slice(-20);
+      }
+      if (room.activity && room.activity.length > 30) {
+        room.activity = room.activity.slice(0, 30);
+      }
+
+      // Evict abandoned / expired / inactive rooms (except curated default rooms)
+      if (!isCurated) {
+        const hasOnline = Object.values(room.participants || {}).some((p) => p.isOnline);
+        const isExpired = room.metadata.expiresAt && now > room.metadata.expiresAt;
+        const isInactive = !room.metadata.active;
+        const lastTouch = Math.max(
+          room.serverTimestamp || 0,
+          room.playback?.updatedAt || 0,
+          room.metadata.createdAt || 0
+        );
+        const isAbandoned = !hasOnline && now - lastTouch > 60 * 60 * 1000; // 1 hour
+
+        if (isExpired || isInactive || isAbandoned) {
+          this.nextGenRooms.delete(roomId);
+          this.roomSockets.delete(roomId);
+          continue;
+        }
+      }
+
+      if (roomUpdated) {
+        room.serverTimestamp = now;
+        this.broadcastToRoom(roomId, 'jam:room_state', { state: room });
+      }
+    }
+
+    // 2. Sweep legacy car sessions
+    for (const [sessionId, session] of this.sessions.entries()) {
+      if (session.members.size === 0 || now - (session.updatedAt || 0) > 60 * 60 * 1000) {
+        this.sessions.delete(sessionId);
+        this.sockets.delete(sessionId);
       }
     }
   }

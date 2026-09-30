@@ -15,6 +15,7 @@ import { useJamStore } from '../store/useJamStore';
 import { usePlayerStore } from '../../../stores/playerStore';
 import { JamConnectionStatus } from './JamConnectionStatus';
 import { JAM_MODE_CONFIGS } from '../recommendations/JamModeConfig';
+import { isParticipantOnline } from '../services/JamPresenceService';
 
 export const JamHeader: React.FC = () => {
   const { setSearchModalOpen } = usePlayerStore();
@@ -34,7 +35,7 @@ export const JamHeader: React.FC = () => {
 
   const isHost = room.metadata.hostId === userId;
   const modeConfig = JAM_MODE_CONFIGS[room.metadata.mode] || JAM_MODE_CONFIGS.chill;
-  const participantsList = Object.values(room.participants || {});
+  const participantsList = Object.values(room.participants || {}).filter(isParticipantOnline);
 
   return (
     <header className="w-full flex items-center justify-between pb-4 border-b border-white/10 flex-wrap gap-3">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Crown, MoreVertical, LogOut, Check, Wifi, UserCheck, Shield } from 'lucide-react';
 import { useJamStore } from '../store/useJamStore';
 import { JamParticipant } from '../types/jam.types';
+import { isParticipantOnline } from '../services/JamPresenceService';
 
 export const JamParticipants: React.FC = () => {
   const { room, userId, transferHost } = useJamStore();
@@ -11,6 +12,18 @@ export const JamParticipants: React.FC = () => {
 
   const participantsList = Object.values(room.participants || {});
   const isHost = room.metadata.hostId === userId;
+  const onlineParticipants = participantsList.filter(isParticipantOnline);
+
+  // Sort host and active online listeners to the top
+  const sortedParticipants = [...participantsList].sort((a, b) => {
+    const aHost = a.id === room.metadata.hostId ? 1 : 0;
+    const bHost = b.id === room.metadata.hostId ? 1 : 0;
+    if (aHost !== bHost) return bHost - aHost;
+    const aOnline = isParticipantOnline(a) ? 1 : 0;
+    const bOnline = isParticipantOnline(b) ? 1 : 0;
+    if (aOnline !== bOnline) return bOnline - aOnline;
+    return (b.lastSeen || 0) - (a.lastSeen || 0);
+  });
 
   const handleConfirmTransfer = async () => {
     if (selectedUserForTransfer) {
@@ -23,17 +36,18 @@ export const JamParticipants: React.FC = () => {
     <div className="w-full space-y-3">
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-bold text-white uppercase tracking-wider">
-          Listening Together ({participantsList.length})
+          Listening Together ({onlineParticipants.length})
         </span>
-        <span className="text-[10px] font-mono text-slate-400">
-          {participantsList.filter((p) => p.isOnline).length} Active Online
+        <span className="text-[10px] font-mono text-emerald-400">
+          {onlineParticipants.length} Active Online
         </span>
       </div>
 
       <div className="space-y-1.5 max-h-[320px] overflow-y-auto no-scrollbar">
-        {participantsList.map((participant) => {
+        {sortedParticipants.map((participant) => {
           const isParticipantHost = participant.role === 'host' || participant.id === room.metadata.hostId;
           const isCurrentUser = participant.id === userId;
+          const active = isParticipantOnline(participant);
 
           return (
             <div
@@ -54,7 +68,7 @@ export const JamParticipants: React.FC = () => {
                   />
                   <span
                     className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#090c14] ${
-                      participant.isOnline ? 'bg-emerald-400' : 'bg-slate-500'
+                      active ? 'bg-emerald-400' : 'bg-slate-500'
                     }`}
                   />
                 </div>
@@ -75,7 +89,9 @@ export const JamParticipants: React.FC = () => {
                         <Crown className="w-2.5 h-2.5" /> Room Host
                       </span>
                     ) : (
-                      <span>Listening</span>
+                      <span className={active ? 'text-slate-300' : 'text-slate-500'}>
+                        {active ? 'Listening' : 'Offline'}
+                      </span>
                     )}
                   </span>
                 </div>

@@ -136,6 +136,7 @@ export class JamService {
    * Leaves active Jam room
    */
   public static async leaveRoom(roomId: string, userId: string, userName: string) {
+    await jamRepository.leaveRoom(roomId, userId);
     await jamRepository.logActivity(roomId, {
       id: `${Date.now()}-leave`,
       type: 'USER_LEAVE',

@@ -4,8 +4,10 @@ import { Song } from '../../../lib/music/types';
 import { JamPlaybackService } from './JamPlaybackService';
 
 export class JamQueueService {
+  private static recentAddTimestamps = new Map<string, number>();
+
   /**
-   * Adds a track to the collaborative Jam queue
+   * Adds a track to the collaborative Jam queue (with duplicate prevention & debounce)
    */
   public static async addToQueue(
     state: JamRoomState,
@@ -17,15 +19,44 @@ export class JamQueueService {
       throw new Error('Guests cannot add tracks to this Jam.');
     }
 
+    // 1. Debounce rapid double-taps within 1.5 seconds
+    const debounceKey = `${state.metadata.id}-${track.id}`;
+    const lastAdd = JamQueueService.recentAddTimestamps.get(debounceKey) || 0;
+    const now = Date.now();
+    if (now - lastAdd < 1500) {
+      console.warn(`[JamQueue] Debouncing rapid add for "${track.title}"`);
+      return;
+    }
+    JamQueueService.recentAddTimestamps.set(debounceKey, now);
+
+    // 2. Prevent adding if song is currently playing in the room
+    if (state.playback.trackId === track.id) {
+      console.warn(`[JamQueue] Track "${track.title}" is currently playing.`);
+      return;
+    }
+
+    // 3. Prevent duplicate tracks already in the queue
+    const isAlreadyInQueue = state.queue.some((q) => q.track.id === track.id);
+    if (isAlreadyInQueue) {
+      console.warn(`[JamQueue] Track "${track.title}" is already in the queue.`);
+      return;
+    }
+
+    // 4. If room has no active track playing, start playing it immediately
+    if (!state.playback.trackId) {
+      await JamPlaybackService.changeTrack(state, actor.id, actor.name, track);
+      return;
+    }
+
     const newItem: JamQueueItem = {
-      id: `${track.id}-${Date.now()}`,
+      id: `${track.id}-${now}`,
       track,
       addedBy: {
         id: actor.id,
         displayName: actor.name,
         avatar: actor.avatar,
       },
-      addedAt: Date.now(),
+      addedAt: now,
       position: state.queue.length,
     };
 
@@ -33,11 +64,11 @@ export class JamQueueService {
     await jamRepository.addQueueItem(state.metadata.id, newItem, newQueue);
 
     await jamRepository.logActivity(state.metadata.id, {
-      id: `${Date.now()}-qadd`,
+      id: `${now}-qadd`,
       type: 'QUEUE_ADD',
       actorId: actor.id,
       actorName: actor.name,
-      timestamp: Date.now(),
+      timestamp: now,
       message: `${actor.name} added "${track.title}" to the queue`,
       payload: { trackTitle: track.title, trackArtist: track.primaryArtist },
     });
@@ -118,8 +149,13 @@ export class JamQueueService {
       const nextItem = state.queue[0];
       const remainingQueue = state.queue.slice(1).map((item, idx) => ({ ...item, position: idx }));
 
-      await jamRepository.setQueue(state.metadata.id, remainingQueue);
+      // 1. Transition playback track first
       await JamPlaybackService.changeTrack(state, actorId, actorName, nextItem.track);
+      // 2. Set remaining queue after successful track transition
+      await jamRepository.setQueue(state.metadata.id, remainingQueue);
+    } else {
+      // If queue is empty, reset skip votes
+      await jamRepository.voteSkip(state.metadata.id, '', []);
     }
   }
 
@@ -136,7 +172,11 @@ export class JamQueueService {
     currentVotes.add(userId);
 
     const updatedVotes = Array.from(currentVotes);
-    const onlineParticipants = Object.values(state.participants).filter((p) => p.isOnline);
+    const now = Date.now();
+    // Count only participants with active heartbeat within last 35 seconds
+    const onlineParticipants = Object.values(state.participants).filter(
+      (p) => p.isOnline && now - (p.lastSeen || 0) < 35000
+    );
     const totalParticipants = Math.max(1, onlineParticipants.length);
 
     const thresholdPercent = state.settings.voteSkipThresholdPercent || 50;
@@ -144,11 +184,11 @@ export class JamQueueService {
 
     await jamRepository.voteSkip(state.metadata.id, userId, updatedVotes);
     await jamRepository.logActivity(state.metadata.id, {
-      id: `${Date.now()}-voteskip`,
+      id: `${now}-voteskip`,
       type: 'VOTE_SKIP',
       actorId: userId,
       actorName: userName,
-      timestamp: Date.now(),
+      timestamp: now,
       message: `${userName} voted to skip (${updatedVotes.length}/${votesNeeded} votes)`,
     });
 

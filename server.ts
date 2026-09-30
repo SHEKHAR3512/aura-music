@@ -319,16 +319,38 @@ app.post('/api/jam/room-action', (req: Request, res: Response) => {
         room.sequenceNumber = data.sequenceNumber || (room.sequenceNumber + 1);
         room.serverTimestamp = Date.now();
       } else if (type === 'QUEUE_ADD') {
-        room.queue = data.queue || [...room.queue, data.item];
+        if (Array.isArray(data.queue)) {
+          const seen = new Set<string>();
+          room.queue = data.queue.filter((q: any) => {
+            const tid = q?.track?.id || q?.id;
+            if (!tid || seen.has(tid)) return false;
+            seen.add(tid);
+            return true;
+          });
+        } else if (data.item) {
+          const trackId = data.item.track?.id || data.item.id;
+          const alreadyExists = room.queue.some((q) => (q.track?.id || q.id) === trackId);
+          if (!alreadyExists) {
+            room.queue = [...room.queue, data.item];
+          }
+        }
         room.serverTimestamp = Date.now();
       } else if (type === 'QUEUE_SET') {
-        room.queue = data.queue;
+        if (Array.isArray(data.queue)) {
+          const seen = new Set<string>();
+          room.queue = data.queue.filter((q: any) => {
+            const tid = q?.track?.id || q?.id;
+            if (!tid || seen.has(tid)) return false;
+            seen.add(tid);
+            return true;
+          });
+        }
         room.serverTimestamp = Date.now();
       } else if (type === 'REACTION') {
-        room.reactions = [...room.reactions.slice(-30), data.reaction];
+        room.reactions = [...room.reactions.slice(-20), data.reaction];
         room.serverTimestamp = Date.now();
       } else if (type === 'ACTIVITY') {
-        room.activity = [data.event, ...room.activity.slice(0, 49)];
+        room.activity = [data.event, ...room.activity.slice(0, 29)];
         room.serverTimestamp = Date.now();
       } else if (type === 'SETTINGS_UPDATE') {
         room.settings = { ...room.settings, ...data.settings };
@@ -344,6 +366,13 @@ app.post('/api/jam/room-action', (req: Request, res: Response) => {
           isOnline: true,
         };
         room.serverTimestamp = Date.now();
+      } else if ((type === 'LEAVE' || type === 'ROOM_LEAVE') && (data.participantId || data.userId)) {
+        const pId = data.participantId || data.userId;
+        if (room.participants[pId]) {
+          room.participants[pId].isOnline = false;
+          room.participants[pId].lastSeen = Date.now();
+          room.serverTimestamp = Date.now();
+        }
       } else if (type === 'TRANSFER_HOST') {
         room.metadata.hostId = data.newHostId;
         if (room.participants[data.newHostId]) {
@@ -521,6 +550,11 @@ app.post('/api/auth/send-email-otp', async (req: Request, res: Response) => {
   // Generate 6-digit OTP code
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+  if (emailOtpStore.size >= 500) {
+    const oldest = emailOtpStore.keys().next().value;
+    if (oldest) emailOtpStore.delete(oldest);
+  }
 
   emailOtpStore.set(normalizedEmail, {
     code,

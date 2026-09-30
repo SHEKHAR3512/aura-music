@@ -28,6 +28,7 @@ import { JamCreateModal } from './JamCreateModal';
 import { JamJoinModal } from './JamJoinModal';
 import { JamDebugPanel } from './JamDebugPanel';
 import { usePlayerStore } from '../../../stores/playerStore';
+import { isParticipantOnline } from '../services/JamPresenceService';
 
 export const JamRoom: React.FC = () => {
   const { setSearchModalOpen } = usePlayerStore();
@@ -164,7 +165,7 @@ export const JamRoom: React.FC = () => {
               mobileTab === 'people' ? 'bg-white text-slate-950 font-bold' : 'text-slate-400'
             }`}
           >
-            People ({Object.keys(jamRoom.participants || {}).length})
+            People ({Object.values(jamRoom.participants || {}).filter(isParticipantOnline).length})
           </button>
           <button
             onClick={() => setMobileTab('activity')}

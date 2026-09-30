@@ -31,8 +31,13 @@ import {
 class JamRepository {
   private activeWs: WebSocket | null = null;
   private activeRoomId: string | null = null;
+  private activeParticipantId: string | null = null;
   private rtdbUnsub: Unsubscribe | null = null;
   private reconnectTimeout: any = null;
+
+  public setParticipantId(participantId: string | null) {
+    this.activeParticipantId = participantId;
+  }
 
   /**
    * Creates a new Jam listening room
@@ -331,6 +336,21 @@ class JamRepository {
   }
 
   /**
+   * Participant leaves room (marks offline immediately)
+   */
+  public async leaveRoom(roomId: string, participantId: string) {
+    if (rtdb) {
+      try {
+        update(ref(rtdb, `jams/${roomId}/participants/${participantId}`), {
+          isOnline: false,
+          lastSeen: Date.now(),
+        }).catch(() => {});
+      } catch (e) {}
+    }
+    this.sendWsMessage('LEAVE', { roomId, participantId });
+  }
+
+  /**
    * Ends room
    */
   public async endRoom(roomId: string) {
@@ -372,7 +392,12 @@ class JamRepository {
 
       this.activeWs.onopen = () => {
         if (this.activeWs?.readyState === WebSocket.OPEN) {
-          this.activeWs.send(JSON.stringify({ type: 'jam:room_subscribe', data: { roomId } }));
+          this.activeWs.send(
+            JSON.stringify({
+              type: 'jam:room_subscribe',
+              data: { roomId, participantId: this.activeParticipantId },
+            })
+          );
         }
       };
 

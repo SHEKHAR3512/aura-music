@@ -14,7 +14,7 @@ import {
 import { JamService } from '../services/JamService';
 import { JamPlaybackService } from '../services/JamPlaybackService';
 import { JamQueueService } from '../services/JamQueueService';
-import { jamPresenceService, JamPresenceService } from '../services/JamPresenceService';
+import { jamPresenceService, JamPresenceService, isParticipantOnline } from '../services/JamPresenceService';
 import { jamSyncEngine } from '../sync/JamSyncEngine';
 import { clockSyncService } from '../sync/ClockSyncService';
 import { jamRepository } from '../services/JamRepository';
@@ -251,9 +251,14 @@ export const useJamStore = create<JamStoreState>((set, get) => {
           if (preloaded.playback.track) allSongs.push(preloaded.playback.track);
           preloaded.queue.forEach((q) => allSongs.push(q.track));
 
+          const activeOnlineCount = Math.max(
+            1,
+            Object.values(preloaded.participants || {}).filter(isParticipantOnline).length
+          );
+
           const computedDNA = RoomDNAEngine.calculate(
             allSongs,
-            Object.keys(preloaded.participants || {}).length,
+            activeOnlineCount,
             preloaded.metadata.mode
           );
 
@@ -309,9 +314,14 @@ export const useJamStore = create<JamStoreState>((set, get) => {
           if (updatedRoom.playback.track) allSongs.push(updatedRoom.playback.track);
           updatedRoom.queue.forEach((q) => allSongs.push(q.track));
 
+          const activeOnlineCount = Math.max(
+            1,
+            Object.values(updatedRoom.participants || {}).filter(isParticipantOnline).length
+          );
+
           const computedDNA = RoomDNAEngine.calculate(
             allSongs,
-            Object.keys(updatedRoom.participants || {}).length,
+            activeOnlineCount,
             updatedRoom.metadata.mode
           );
 

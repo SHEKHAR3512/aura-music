@@ -8,6 +8,24 @@ interface CacheEntry<T> {
 
 class MemoryCache {
   private store = new Map<string, CacheEntry<any>>();
+  private cleanupTimer: any = null;
+
+  constructor() {
+    // Periodically sweep expired entries every 60 seconds to release heap memory
+    if (typeof setInterval !== 'undefined') {
+      this.cleanupTimer = setInterval(() => {
+        const now = Date.now();
+        for (const [key, entry] of this.store.entries()) {
+          if (now > entry.expiresAt) {
+            this.store.delete(key);
+          }
+        }
+      }, 60000);
+      if (this.cleanupTimer?.unref) {
+        this.cleanupTimer.unref();
+      }
+    }
+  }
 
   get<T>(key: string): T | null {
     const entry = this.store.get(key);
@@ -20,8 +38,8 @@ class MemoryCache {
   }
 
   set<T>(key: string, data: T, ttlSeconds: number = 300): void {
-    // Keep size under control
-    if (this.store.size > 500) {
+    // Keep size under strict control (max 150 items to stay safely within memory bounds)
+    if (this.store.size >= 150) {
       const oldestKey = this.store.keys().next().value;
       if (oldestKey) this.store.delete(oldestKey);
     }
@@ -33,6 +51,10 @@ class MemoryCache {
 
   has(key: string): boolean {
     return this.get(key) !== null;
+  }
+
+  clear(): void {
+    this.store.clear();
   }
 }
 

@@ -153,8 +153,9 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
               <div className="space-y-1">
                 {songs.map((song, i) => {
                   const isSelected = i === selectedIndex;
-                  const isCurrent = currentTrack?.id === song.id;
-                  const isQueued = queuedSongIds.has(song.id);
+                  const isCurrent = (jamRoom ? jamRoom.playback.trackId : currentTrack?.id) === song.id;
+                  const isAlreadyInQueue = jamRoom?.queue?.some(q => q.track.id === song.id);
+                  const isQueued = isAlreadyInQueue || queuedSongIds.has(song.id);
                   return (
                     <div
                       key={`${song.id}-${i}`}
@@ -192,8 +193,10 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
                         {jamRoom && (
                           <button
                             type="button"
+                            disabled={isQueued || isCurrent}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (isQueued || isCurrent) return;
                               addJamQueue(song);
                               setQueuedSongIds(prev => new Set(prev).add(song.id));
                               setTimeout(() => {
@@ -202,14 +205,16 @@ export const SearchModal: React.FC<SearchModalProps> = ({ onSelectArtist, onSele
                                   next.delete(song.id);
                                   return next;
                                 });
-                              }, 2000);
+                              }, 3000);
                             }}
-                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                            className={`p-1.5 rounded-lg transition-colors ${
                               isQueued 
-                                ? 'text-emerald-400 bg-emerald-500/20' 
-                                : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10'
+                                ? 'text-emerald-400 bg-emerald-500/20 cursor-default' 
+                                : isCurrent
+                                  ? 'text-indigo-400 bg-indigo-500/20 cursor-default'
+                                  : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer'
                             }`}
-                            title={isQueued ? "Added to Jam Queue!" : "Add to Jam Queue"}
+                            title={isCurrent ? "Currently playing" : isQueued ? "In Jam Queue" : "Add to Jam Queue"}
                           >
                             {isQueued ? (
                               <Check className="w-4 h-4 text-emerald-400" />
