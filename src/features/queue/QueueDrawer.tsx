@@ -8,11 +8,14 @@ import {
   ChevronUp, 
   ChevronDown, 
   History, 
-  ListMusic 
+  ListMusic,
+  Disc3
 } from 'lucide-react';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useLibraryStore } from '../../lib/storage/libraryStore';
 import { Song } from '../../lib/music/types';
+import { MiniEqualizerBars } from '../../components/ui/AudioLoaders';
+import { triggerHaptic } from '../../lib/utils/haptics';
 
 export const QueueDrawer: React.FC = () => {
   const {
@@ -22,6 +25,7 @@ export const QueueDrawer: React.FC = () => {
     queueIndex,
     history,
     currentTrack,
+    isPlaying,
     playTrack,
     removeFromQueue,
     reorderQueue,
@@ -40,6 +44,7 @@ export const QueueDrawer: React.FC = () => {
 
   const handleSaveAsPlaylist = () => {
     if (queue.length === 0) return;
+    triggerHaptic('button');
     const title = `Queue Session — ${new Date().toLocaleDateString()}`;
     const newPl = createPlaylist(title, `Saved queue session containing ${queue.length} tracks.`);
     queue.forEach(song => {
@@ -54,15 +59,18 @@ export const QueueDrawer: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-label="Playback Queue"
-      className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-[#0d0f17]/95 backdrop-blur-2xl border-l border-white/10 shadow-2xl flex flex-col animate-slideLeft text-slate-100"
+      className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-[#0a0c14]/95 backdrop-blur-2xl border-l border-white/10 shadow-2xl flex flex-col animate-dwi-slide text-slate-100"
     >
       {/* Header */}
-      <div className="p-4 border-b border-white/10 flex items-center justify-between">
-        <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg">
+      <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/5">
           <button
-            onClick={() => setActiveTab('queue')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              activeTab === 'queue' ? 'bg-white text-slate-950 font-semibold shadow' : 'text-slate-400 hover:text-white'
+            onClick={() => {
+              triggerHaptic('tab');
+              setActiveTab('queue');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'queue' ? 'bg-white text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
             <ListMusic className="w-3.5 h-3.5" />
@@ -70,9 +78,12 @@ export const QueueDrawer: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              activeTab === 'history' ? 'bg-white text-slate-950 font-semibold shadow' : 'text-slate-400 hover:text-white'
+            onClick={() => {
+              triggerHaptic('tab');
+              setActiveTab('history');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'history' ? 'bg-white text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
             <History className="w-3.5 h-3.5" />
@@ -81,9 +92,12 @@ export const QueueDrawer: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setQueueOpen(false)}
+          onClick={() => {
+            triggerHaptic('button');
+            setQueueOpen(false);
+          }}
           aria-label="Close Queue"
-          className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+          className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
@@ -91,32 +105,38 @@ export const QueueDrawer: React.FC = () => {
 
       {/* Queue Options Bar */}
       {activeTab === 'queue' && (
-        <div className="px-4 py-3 bg-white/[0.02] border-b border-white/5 flex items-center justify-between text-xs">
+        <div className="px-5 py-3 bg-white/[0.02] border-b border-white/5 flex items-center justify-between text-xs">
           {/* Smart Queue Toggle */}
           <button
-            onClick={() => setSmartQueue(!smartQueueEnabled)}
-            className={`flex items-center gap-1.5 transition-colors ${
-              smartQueueEnabled ? 'text-[var(--aura-primary,#6366f1)] font-medium' : 'text-slate-400 hover:text-white'
+            onClick={() => {
+              triggerHaptic('button');
+              setSmartQueue(!smartQueueEnabled);
+            }}
+            className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
+              smartQueueEnabled ? 'text-indigo-400 font-bold' : 'text-slate-400 hover:text-white'
             }`}
             title="Auto-continue playback with recommended songs when queue finishes"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Smart Continuation</span>
+            <span>Smart Repertoire</span>
           </button>
 
           <div className="flex items-center gap-3">
             <button
               onClick={handleSaveAsPlaylist}
-              className="text-slate-300 hover:text-white flex items-center gap-1"
+              className="text-slate-300 hover:text-white flex items-center gap-1 cursor-pointer font-medium"
               title="Save current queue as a permanent playlist"
             >
-              <BookmarkPlus className="w-3.5 h-3.5" />
+              <BookmarkPlus className="w-3.5 h-3.5 text-indigo-400" />
               <span>{saveSuccess ? 'Saved!' : 'Save'}</span>
             </button>
 
             <button
-              onClick={clearQueue}
-              className="text-slate-400 hover:text-rose-400 flex items-center gap-1 transition-colors"
+              onClick={() => {
+                triggerHaptic('button');
+                clearQueue();
+              }}
+              className="text-slate-400 hover:text-rose-400 flex items-center gap-1 transition-colors cursor-pointer"
               title="Clear upcoming queue"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -127,26 +147,30 @@ export const QueueDrawer: React.FC = () => {
       )}
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 select-none no-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 select-none no-scrollbar">
         
         {/* Currently Playing Card */}
         {currentTrack && activeTab === 'queue' && (
           <div>
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-              Now Playing
+            <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-2 px-1">
+              Active Stream
             </span>
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-gradient-to-r from-[var(--aura-primary,#6366f1)]/15 to-transparent border border-[var(--aura-primary,#6366f1)]/30">
-              <img
-                src={currentTrack.artwork.low || currentTrack.artwork.medium}
-                alt={currentTrack.title}
-                referrerPolicy="no-referrer"
-                className="w-12 h-12 rounded-lg object-cover shadow shrink-0"
-              />
-              <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-semibold text-white truncate">{currentTrack.title}</h4>
-                <p className="text-xs text-slate-400 truncate">{currentTrack.primaryArtist}</p>
+            <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-[#121626] to-[#0c0e18] border border-indigo-500/30 shadow-md">
+              <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow shrink-0 border border-white/10">
+                <img
+                  src={currentTrack.artwork.low || currentTrack.artwork.medium}
+                  alt={currentTrack.title}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
+                />
               </div>
-              <div className="w-2.5 h-2.5 rounded-full bg-[var(--aura-primary,#6366f1)] animate-ping mr-2" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-indigo-200 truncate">{currentTrack.title}</h4>
+                  {isPlaying && <MiniEqualizerBars color="#818cf8" />}
+                </div>
+                <p className="text-xs text-slate-400 truncate mt-0.5">{currentTrack.primaryArtist}</p>
+              </div>
             </div>
           </div>
         )}
@@ -154,13 +178,13 @@ export const QueueDrawer: React.FC = () => {
         {/* Up Next List */}
         {activeTab === 'queue' && (
           <div>
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-              Next in Queue
+            <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-2.5 px-1">
+              Up Next ({upNextTracks.length})
             </span>
 
             {upNextTracks.length === 0 ? (
-              <div className="text-center py-10 px-4 text-slate-500 text-xs">
-                No upcoming tracks. Queue will auto-continue with similar music.
+              <div className="text-center py-12 px-4 text-slate-500 text-xs">
+                No upcoming tracks. Smart continuation will automatically queue similar music.
               </div>
             ) : (
               <div className="space-y-1.5">
@@ -169,13 +193,16 @@ export const QueueDrawer: React.FC = () => {
                   return (
                     <div
                       key={`${song.id}-${actualIndex}`}
-                      className="group flex items-center justify-between p-2 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5"
+                      className="group flex items-center justify-between p-2.5 rounded-2xl hover:bg-white/[0.04] transition-all border border-transparent hover:border-white/5"
                     >
                       <div 
-                        onClick={() => playTrack(song)}
+                        onClick={() => {
+                          triggerHaptic('button');
+                          playTrack(song);
+                        }}
                         className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
                       >
-                        <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0">
+                        <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow">
                           <img
                             src={song.artwork.low || song.artwork.medium}
                             alt={song.title}
@@ -188,10 +215,10 @@ export const QueueDrawer: React.FC = () => {
                         </div>
 
                         <div className="min-w-0">
-                          <h5 className="text-xs font-semibold text-white truncate group-hover:text-[var(--aura-primary,#6366f1)] transition-colors">
+                          <h5 className="text-xs font-bold text-white truncate group-hover:text-indigo-300 transition-colors">
                             {song.title}
                           </h5>
-                          <p className="text-[11px] text-slate-400 truncate">{song.primaryArtist}</p>
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5">{song.primaryArtist}</p>
                         </div>
                       </div>
 
@@ -199,8 +226,11 @@ export const QueueDrawer: React.FC = () => {
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {idx > 0 && (
                           <button
-                            onClick={() => reorderQueue(actualIndex, actualIndex - 1)}
-                            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10"
+                            onClick={() => {
+                              triggerHaptic('button');
+                              reorderQueue(actualIndex, actualIndex - 1);
+                            }}
+                            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
                             title="Move up"
                           >
                             <ChevronUp className="w-3.5 h-3.5" />
@@ -208,16 +238,22 @@ export const QueueDrawer: React.FC = () => {
                         )}
                         {idx < upNextTracks.length - 1 && (
                           <button
-                            onClick={() => reorderQueue(actualIndex, actualIndex + 1)}
-                            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10"
+                            onClick={() => {
+                              triggerHaptic('button');
+                              reorderQueue(actualIndex, actualIndex + 1);
+                            }}
+                            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
                             title="Move down"
                           >
                             <ChevronDown className="w-3.5 h-3.5" />
                           </button>
                         )}
                         <button
-                          onClick={() => removeFromQueue(actualIndex)}
-                          className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-white/10 ml-1"
+                          onClick={() => {
+                            triggerHaptic('button');
+                            removeFromQueue(actualIndex);
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-white/10 ml-1 cursor-pointer"
                           title="Remove from queue"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -235,27 +271,30 @@ export const QueueDrawer: React.FC = () => {
         {activeTab === 'history' && (
           <div className="space-y-2">
             {history.length === 0 ? (
-              <div className="text-center py-12 text-slate-500 text-xs">
-                Tracks you play during this session will appear here.
+              <div className="text-center py-16 text-slate-500 text-xs">
+                Recordings streamed during this session will appear here.
               </div>
             ) : (
               history.map((song, i) => (
                 <div
                   key={`${song.id}-hist-${i}`}
-                  onClick={() => playTrack(song)}
-                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group"
+                  onClick={() => {
+                    triggerHaptic('button');
+                    playTrack(song);
+                  }}
+                  className="flex items-center gap-3 p-2.5 rounded-2xl hover:bg-white/[0.04] transition-all cursor-pointer group border border-transparent hover:border-white/5"
                 >
                   <img
                     src={song.artwork.low || song.artwork.medium}
                     alt={song.title}
                     referrerPolicy="no-referrer"
-                    className="w-10 h-10 rounded-lg object-cover shrink-0"
+                    className="w-10 h-10 rounded-xl object-cover shrink-0 border border-white/10 shadow"
                   />
                   <div className="min-w-0 flex-1">
-                    <h5 className="text-xs font-semibold text-white truncate group-hover:text-[var(--aura-primary,#6366f1)] transition-colors">
+                    <h5 className="text-xs font-bold text-white truncate group-hover:text-indigo-300 transition-colors">
                       {song.title}
                     </h5>
-                    <p className="text-[11px] text-slate-400 truncate">{song.primaryArtist}</p>
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5">{song.primaryArtist}</p>
                   </div>
                 </div>
               ))

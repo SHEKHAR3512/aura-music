@@ -428,15 +428,15 @@ export const AuthModal: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-label="Member Authentication & Settings"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-2xl animate-dwi-enter"
     >
       {/* Invisible reCAPTCHA container */}
       <div id="recaptcha-container" ref={recaptchaContainerRef} />
 
       <div 
-        className="relative w-full max-w-3xl bg-[#0d0f17] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row text-slate-100 min-h-[520px]"
+        className="relative w-full max-w-3xl bg-[#0c0f18]/95 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row text-slate-100 min-h-[520px]"
         style={{
-          boxShadow: '0 25px 60px -15px var(--aura-glow, rgba(0,0,0,0.8))',
+          boxShadow: '0 25px 60px -15px rgba(0,0,0,0.8), 0 0 30px rgba(99,102,241,0.15)',
         }}
       >
         {/* Left Side: Visual Pane (Desktop) */}

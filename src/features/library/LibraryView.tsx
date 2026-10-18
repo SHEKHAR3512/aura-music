@@ -13,13 +13,16 @@ import {
   Sparkles,
   Check,
   WifiOff,
-  CloudCheck
+  CloudCheck,
+  Disc3
 } from 'lucide-react';
 import { useLibraryStore } from '../../lib/storage/libraryStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { Playlist, Song, Artist } from '../../lib/music/types';
 import { offlineMetadataCache } from '../../lib/storage/offlineMetadataCache';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import { MasterTrackCard, AuraArtistCard, AuraPlaylistCard } from '../../components/ui/AuraCards';
+import { triggerHaptic } from '../../lib/utils/haptics';
 
 interface LibraryViewProps {
   onSelectPlaylist: (playlist: Playlist) => void;
@@ -42,19 +45,20 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
   const handleCreatePlaylist = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
-    const pl = createPlaylist(newTitle.trim(), newDesc.trim());
+    triggerHaptic('button');
+    createPlaylist(newTitle.trim(), newDesc.trim());
     setNewTitle('');
     setNewDesc('');
     setShowCreateModal(false);
   };
 
   return (
-    <div className="space-y-8 pb-24 animate-fadeIn text-slate-100">
+    <div className="space-y-10 pb-24 animate-dwi-enter text-slate-100">
       
-      {/* Profile Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-black border border-white/10 shadow-2xl">
+      {/* Profile Bar with Studio Telemetry */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#0d101a] via-[#121626] to-[#090b12] border border-white/10 shadow-2xl">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[var(--aura-primary,#6366f1)]/50 shadow-xl shrink-0">
+          <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-indigo-400 shadow-xl shrink-0">
             <img
               src={profile.avatar}
               alt={profile.name}
@@ -63,9 +67,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">{profile.name}</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-display">{profile.name}</h2>
               {profile.provider !== 'guest' && (
-                <span className="p-1 rounded-full bg-emerald-500/20 text-emerald-400">
+                <span className="p-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                   <Check className="w-3 h-3" />
                 </span>
               )}
@@ -93,7 +97,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
             </div>
 
             <button
-              onClick={toggleForcedOffline}
+              onClick={() => {
+                triggerHaptic('button');
+                toggleForcedOffline();
+              }}
               role="switch"
               aria-checked={isForcedOffline}
               aria-label="Force offline mode to test cached metadata"
@@ -113,13 +120,16 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
 
           {profile.provider === 'guest' ? (
             <button
-              onClick={() => setAuthModalOpen(true)}
-              className="px-5 py-2 rounded-full bg-white text-slate-950 text-xs font-bold hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+              onClick={() => {
+                triggerHaptic('button');
+                setAuthModalOpen(true);
+              }}
+              className="px-6 py-2.5 rounded-full bg-white text-slate-950 text-xs font-bold hover:scale-105 active:scale-95 transition-transform cursor-pointer shadow-lg"
             >
               Sign In / Register
             </button>
           ) : (
-            <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
+            <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1.5 rounded-full">
               <span>Synchronized Cloud Account</span>
             </div>
           )}
@@ -128,71 +138,50 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto no-scrollbar">
-        <button
-          onClick={() => setActiveTab('playlists')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
-            activeTab === 'playlists' ? 'bg-white text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <FolderPlus className="w-4 h-4" />
-          <span>Playlists ({playlists.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('likes')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
-            activeTab === 'likes' ? 'bg-white text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Heart className="w-4 h-4" />
-          <span>Liked Songs ({likedSongIds.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('offline')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
-            activeTab === 'offline' ? 'bg-white text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <WifiOff className="w-4 h-4 text-emerald-400" />
-          <span>Offline Ready ({offlineArtists.length + offlinePlaylists.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('stats')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
-            activeTab === 'stats' ? 'bg-white text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <BarChart2 className="w-4 h-4" />
-          <span>Listening Journal & Stats</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('recent')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
-            activeTab === 'recent' ? 'bg-white text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Clock className="w-4 h-4" />
-          <span>Recently Played</span>
-        </button>
+        {[
+          { id: 'playlists', label: `Playlists (${playlists.length})`, icon: FolderPlus },
+          { id: 'likes', label: `Liked Songs (${likedSongIds.length})`, icon: Heart },
+          { id: 'offline', label: `Offline Ready (${offlineArtists.length + offlinePlaylists.length})`, icon: WifiOff },
+          { id: 'stats', label: 'Listening Journal & Stats', icon: BarChart2 },
+          { id: 'recent', label: 'Recently Played', icon: Clock },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                triggerHaptic('tab');
+                setActiveTab(tab.id as any);
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                isActive 
+                  ? 'bg-white text-slate-950 font-bold shadow-md scale-102' 
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* TAB 1: User Playlists */}
       {activeTab === 'playlists' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-white tracking-tight">Your Collections</h3>
+            <h3 className="text-xl font-bold text-white tracking-tight font-display">Your Collections</h3>
             <button
               onClick={() => {
+                triggerHaptic('button');
                 if (profile.provider === 'guest' || profile.isAnonymous) {
                   setAuthModalOpen(true);
                   return;
                 }
                 setShowCreateModal(true);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--aura-primary,#6366f1)] hover:opacity-90 text-white text-xs font-semibold shadow transition-opacity cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-slate-950 text-xs font-bold shadow hover:bg-slate-100 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Create Playlist</span>
@@ -201,45 +190,25 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {playlists.map((pl, i) => (
-              <div
-                key={`${pl.id}-${i}`}
-                onClick={() => onSelectPlaylist(pl)}
-                className="group p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 transition-all cursor-pointer flex flex-col justify-between"
-              >
-                <div>
-                  <div className="relative aspect-square rounded-xl overflow-hidden mb-3 shadow-md">
-                    <img
-                      src={pl.artwork.medium || pl.artwork.low}
-                      alt={pl.title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <div className="w-12 h-12 rounded-full bg-white text-slate-950 flex items-center justify-center shadow-lg">
-                        <Play className="w-5 h-5 fill-current translate-x-0.5" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <h4 className="text-base font-bold text-white truncate">{pl.title}</h4>
-                  <p className="text-xs text-slate-400 mt-1 line-clamp-2">{pl.description}</p>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 mt-3 border-t border-white/5 text-[11px] font-mono text-slate-400">
-                  <span>{pl.songCount} Tracks</span>
-                  {pl.isCustom && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deletePlaylist(pl.id);
-                      }}
-                      className="text-slate-500 hover:text-rose-400 transition-colors"
-                      title="Delete playlist"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
+              <div key={`${pl.id}-${i}`} className="relative group">
+                <AuraPlaylistCard
+                  playlist={pl}
+                  onClick={() => onSelectPlaylist(pl)}
+                  badge={`${pl.songCount} Tracks`}
+                />
+                {pl.isCustom && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      triggerHaptic('button');
+                      deletePlaylist(pl.id);
+                    }}
+                    className="absolute top-5 right-5 p-2 rounded-full bg-black/60 backdrop-blur-md text-slate-400 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                    title="Delete playlist"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -249,22 +218,23 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
       {/* TAB: Offline Ready Cached Items */}
       {activeTab === 'offline' && (
         <div className="space-y-6">
-          <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 uppercase tracking-wider mb-1">
+              <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 uppercase tracking-wider mb-1 font-bold">
                 <WifiOff className="w-3.5 h-3.5" />
                 <span>Offline Metadata Cache Active</span>
               </div>
               <p className="text-xs text-slate-300">
-                Frequently visited artists and playlists are automatically stored in LocalStorage and Cache Storage for offline catalog browsing.
+                Frequently visited artists and playlists are automatically stored in LocalStorage for offline catalog browsing.
               </p>
             </div>
             <button
               onClick={() => {
+                triggerHaptic('button');
                 offlineMetadataCache.clearCache();
                 window.location.reload();
               }}
-              className="text-xs font-medium text-slate-400 hover:text-rose-400 transition-colors self-start sm:self-auto shrink-0"
+              className="text-xs font-medium text-slate-400 hover:text-rose-400 transition-colors self-start sm:self-auto shrink-0 cursor-pointer"
             >
               Clear Cache
             </button>
@@ -279,27 +249,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
             {offlineArtists.length === 0 ? (
               <p className="text-xs text-slate-500 py-3">No artists cached yet. Visit artist profiles to save them for offline browsing.</p>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {offlineArtists.map((artist, i) => (
-                  <div
+                  <AuraArtistCard
                     key={`${artist.id}-${i}`}
+                    artist={artist}
                     onClick={() => onSelectArtist && onSelectArtist(artist)}
-                    className="p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 transition-all cursor-pointer flex flex-col items-center text-center group"
-                  >
-                    <div className="relative w-20 h-20 rounded-full overflow-hidden mb-2 border border-white/10 group-hover:border-emerald-400 transition-colors shadow">
-                      <img
-                        src={artist.image.medium || artist.image.low}
-                        alt={artist.name}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <span className="text-xs font-bold text-white truncate w-full">{artist.name}</span>
-                    <span className="text-[10px] text-emerald-400 font-mono mt-0.5 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      Offline Cached
-                    </span>
-                  </div>
+                  />
                 ))}
               </div>
             )}
@@ -314,26 +270,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
             {offlinePlaylists.length === 0 ? (
               <p className="text-xs text-slate-500 py-3">No external playlists cached yet. Visit playlists to enable offline access.</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {offlinePlaylists.map((pl, i) => (
-                  <div
+                  <AuraPlaylistCard
                     key={`${pl.id}-${i}`}
+                    playlist={pl}
                     onClick={() => onSelectPlaylist(pl)}
-                    className="p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 transition-all cursor-pointer flex items-center gap-3"
-                  >
-                    <img
-                      src={pl.artwork.medium || pl.artwork.low}
-                      alt={pl.title}
-                      referrerPolicy="no-referrer"
-                      className="w-12 h-12 rounded-xl object-cover shadow shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <h5 className="text-xs font-semibold text-white truncate">{pl.title}</h5>
-                      <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">
-                        {pl.songCount} Tracks · Ready Offline
-                      </span>
-                    </div>
-                  </div>
+                    badge="Offline Ready"
+                  />
                 ))}
               </div>
             )}
@@ -345,7 +289,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
       {activeTab === 'likes' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-white tracking-tight">Favorite Recordings</h3>
+            <h3 className="text-xl font-bold text-white tracking-tight font-display">Favorite Recordings</h3>
             <span className="text-xs text-slate-400 font-mono">{likedSongIds.length} tracks</span>
           </div>
 
@@ -354,32 +298,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
               No liked songs yet. Click the heart icon on any track to save it here.
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
               {recentlyPlayed.map((song, i) => (
-                <div
+                <MasterTrackCard
                   key={`${song.id}-${i}`}
-                  onClick={() => playTrack(song)}
-                  className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-transparent hover:border-white/5 cursor-pointer transition-colors group"
-                >
-                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                    <img
-                      src={song.artwork.low || song.artwork.medium}
-                      alt={song.title}
-                      referrerPolicy="no-referrer"
-                      className="w-11 h-11 rounded-xl object-cover shadow shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <h4 className="text-sm font-semibold text-white truncate group-hover:text-[var(--aura-primary,#6366f1)] transition-colors">
-                        {song.title}
-                      </h4>
-                      <p className="text-xs text-slate-400 truncate">{song.primaryArtist}</p>
-                    </div>
-                  </div>
-
-                  <span className="text-xs font-mono text-slate-400 tabular-nums">
-                    {Math.floor(song.duration / 60)}:{(song.duration % 60).toString().padStart(2, '0')}
-                  </span>
-                </div>
+                  song={song}
+                  playlistContext={recentlyPlayed}
+                  index={i}
+                  showRank={true}
+                />
               ))}
             </div>
           )}
@@ -390,31 +317,31 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
       {activeTab === 'stats' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5">
+            <div className="p-6 rounded-3xl bg-[#0c0f18]/80 border border-white/[0.06] shadow-lg">
               <span className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-1">
                 Listening Time
               </span>
-              <div className="text-3xl font-black text-white tabular-nums">
+              <div className="text-3xl font-black text-white tabular-nums font-display">
                 {stats.totalMinutesListened} <span className="text-sm font-normal text-slate-400">min</span>
               </div>
               <p className="text-[11px] text-slate-500 mt-2">High-fidelity audio playback tracked</p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5">
+            <div className="p-6 rounded-3xl bg-[#0c0f18]/80 border border-white/[0.06] shadow-lg">
               <span className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-1">
                 Tracks Completed
               </span>
-              <div className="text-3xl font-black text-white tabular-nums">
+              <div className="text-3xl font-black text-white tabular-nums font-display">
                 {stats.tracksPlayedCount}
               </div>
               <p className="text-[11px] text-slate-500 mt-2">Unique play sessions recorded</p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5">
+            <div className="p-6 rounded-3xl bg-[#0c0f18]/80 border border-white/[0.06] shadow-lg">
               <span className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-1">
                 Most Played Melody
               </span>
-              <div className="text-base font-bold text-white truncate">
+              <div className="text-base font-bold text-white truncate font-display">
                 {stats.mostPlayedSong?.title || 'Kesariya'}
               </div>
               <p className="text-xs text-slate-400 truncate mt-0.5">
@@ -425,31 +352,31 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
 
           {/* Top Artists & Top Genres */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-3">
+            <div className="p-6 rounded-3xl bg-[#0c0f18]/80 border border-white/[0.06] space-y-3 shadow-lg">
               <h4 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
                 Top Repertoire Artists
               </h4>
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {stats.topArtists.map((artist, i) => (
-                  <div key={artist.name} className="flex items-center justify-between text-xs">
-                    <span className="text-slate-300 font-medium">
+                  <div key={artist.name} className="flex items-center justify-between text-xs py-1 border-b border-white/5 last:border-0">
+                    <span className="text-slate-200 font-medium">
                       {i + 1}. {artist.name}
                     </span>
-                    <span className="text-slate-400 font-mono tabular-nums">{artist.count} plays</span>
+                    <span className="text-indigo-400 font-mono tabular-nums font-bold">{artist.count} plays</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-3">
+            <div className="p-6 rounded-3xl bg-[#0c0f18]/80 border border-white/[0.06] space-y-3 shadow-lg">
               <h4 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
                 Top Acoustic Genres
               </h4>
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {stats.topGenres.map((genre) => (
-                  <div key={genre.name} className="flex items-center justify-between text-xs">
-                    <span className="text-slate-300 font-medium">{genre.name}</span>
-                    <span className="text-slate-400 font-mono tabular-nums">{genre.count} sessions</span>
+                  <div key={genre.name} className="flex items-center justify-between text-xs py-1 border-b border-white/5 last:border-0">
+                    <span className="text-slate-200 font-medium">{genre.name}</span>
+                    <span className="text-cyan-400 font-mono tabular-nums font-bold">{genre.count} sessions</span>
                   </div>
                 ))}
               </div>
@@ -460,31 +387,23 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
 
       {/* TAB 4: Recently Played */}
       {activeTab === 'recent' && (
-        <div className="space-y-2">
-          {recentlyPlayed.map((song, i) => (
-            <div
-              key={`${song.id}-rp-${i}`}
-              onClick={() => playTrack(song)}
-              className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-transparent hover:border-white/5 cursor-pointer transition-colors"
-            >
-              <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                <img
-                  src={song.artwork.low || song.artwork.medium}
-                  alt={song.title}
-                  referrerPolicy="no-referrer"
-                  className="w-11 h-11 rounded-xl object-cover shadow shrink-0"
-                />
-                <div className="min-w-0">
-                  <h4 className="text-sm font-semibold text-white truncate">{song.title}</h4>
-                  <p className="text-xs text-slate-400 truncate">{song.primaryArtist}</p>
-                </div>
-              </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-white tracking-tight font-display">Recently Streamed</h3>
+            <span className="text-xs text-slate-400 font-mono">{recentlyPlayed.length} recordings</span>
+          </div>
 
-              <span className="text-xs font-mono text-slate-400 tabular-nums">
-                {Math.floor(song.duration / 60)}:{(song.duration % 60).toString().padStart(2, '0')}
-              </span>
-            </div>
-          ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {recentlyPlayed.map((song, i) => (
+              <MasterTrackCard
+                key={`${song.id}-rp-${i}`}
+                song={song}
+                playlistContext={recentlyPlayed}
+                index={i}
+                showRank={true}
+              />
+            ))}
+          </div>
         </div>
       )}
 
@@ -493,47 +412,47 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onSelectPlaylist, onSe
         <div 
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-dwi-enter"
         >
-          <div className="w-full max-w-md bg-[#0f111a] border border-white/10 rounded-2xl p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-4">Create New Playlist</h3>
+          <div className="w-full max-w-md bg-[#0e111a] border border-white/10 rounded-3xl p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-4 font-display">Create New Collection</h3>
             <form onSubmit={handleCreatePlaylist} className="space-y-4">
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">Title</label>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">Title</label>
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Ambient Deep Focus"
+                  placeholder="e.g. Midnight Acoustic Sessions"
                   required
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-[var(--aura-primary,#6366f1)]"
+                  className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-400"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">Description (optional)</label>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">Description (optional)</label>
                 <textarea
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   placeholder="Describe the sonic mood or purpose..."
                   rows={3}
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-[var(--aura-primary,#6366f1)] resize-none"
+                  className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-400 resize-none"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex items-center justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-white text-slate-900 text-xs font-bold hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="px-6 py-2.5 rounded-xl bg-white text-slate-900 text-xs font-bold hover:bg-slate-100 transition-colors cursor-pointer shadow-lg"
                 >
-                  Save Playlist
+                  Save Collection
                 </button>
               </div>
             </form>

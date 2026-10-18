@@ -16,7 +16,8 @@ import {
   ListMusic, 
   Gauge,
   Sparkles,
-  Car
+  Car,
+  Disc3
 } from 'lucide-react';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useJamStore } from '../jam/store/useJamStore';
@@ -24,6 +25,7 @@ import { useAudioTime, formatTime } from '../../hooks/useAudioTime';
 import { SyncedLyricsView } from '../lyrics/SyncedLyricsView';
 import { VisualizerCanvas } from '../visualizer/VisualizerCanvas';
 import { QueueDrawer } from '../queue/QueueDrawer';
+import { EqualizerLoader } from '../../components/ui/AudioLoaders';
 import { triggerHaptic } from '../../lib/utils/haptics';
 import { SafeImage } from '../../components/ui/SafeImage';
 
@@ -73,88 +75,107 @@ export const ExpandedPlayer: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-label="Expanded Now Playing Experience"
-      className="fixed inset-0 z-50 flex flex-col bg-[#08090d] text-slate-100 overflow-hidden select-none animate-fadeIn"
+      className="fixed inset-0 z-50 flex flex-col bg-[#07080c] text-slate-100 overflow-hidden select-none animate-dwi-enter"
     >
       {/* Dynamic Atmospheric Blurred Backdrop */}
       <div 
-        className="absolute inset-0 pointer-events-none opacity-40 blur-3xl scale-125 transition-all duration-1000"
+        className="absolute inset-0 pointer-events-none opacity-35 blur-3xl scale-125 transition-all duration-1000"
         style={{
-          backgroundImage: `radial-gradient(circle at 50% 35%, var(--aura-primary, #6366f1) 0%, var(--aura-secondary, #8b5cf6) 40%, rgba(8,9,13,0.95) 85%)`,
+          backgroundImage: `radial-gradient(circle at 50% 35%, var(--aura-primary, #6366f1) 0%, var(--aura-secondary, #8b5cf6) 40%, rgba(7,8,12,0.95) 85%)`,
         }}
       />
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-2xl pointer-events-none" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-3xl pointer-events-none" />
 
       {/* Top Header Bar */}
-      <div className="relative z-10 flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b border-white/10 gap-2">
+      <div className="relative z-10 flex items-center justify-between px-4 sm:px-8 py-4 sm:py-5 border-b border-white/10 gap-3">
         <button
-          onClick={toggleExpandedPlayer}
+          onClick={() => {
+            triggerHaptic('button');
+            toggleExpandedPlayer();
+          }}
           aria-label="Collapse player"
-          className="p-1.5 sm:p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+          className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
         >
           <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
 
         {/* Center Mode Switcher Tabs */}
-        <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10">
+        <div className="flex items-center gap-1 p-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10">
           <button
-            onClick={() => setActiveTab('artwork')}
-            className={`px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-all ${
-              activeTab === 'artwork' ? 'bg-white text-slate-950 shadow-md' : 'text-slate-300 hover:text-white'
+            onClick={() => {
+              triggerHaptic('tab');
+              setActiveTab('artwork');
+            }}
+            className={`px-3.5 sm:px-5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'artwork' ? 'bg-white text-slate-950 shadow-md font-bold' : 'text-slate-300 hover:text-white'
             }`}
           >
             Artwork
           </button>
           <button
-            onClick={() => setActiveTab('lyrics')}
-            className={`flex items-center gap-1 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-all ${
-              activeTab === 'lyrics' ? 'bg-white text-slate-950 shadow-md' : 'text-slate-300 hover:text-white'
+            onClick={() => {
+              triggerHaptic('tab');
+              setActiveTab('lyrics');
+            }}
+            className={`flex items-center gap-1.5 px-3.5 sm:px-5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'lyrics' ? 'bg-white text-slate-950 shadow-md font-bold' : 'text-slate-300 hover:text-white'
             }`}
           >
-            <Mic2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <Mic2 className="w-3.5 h-3.5" />
             <span>Lyrics</span>
           </button>
           <button
-            onClick={() => setActiveTab('visualizer')}
-            className={`flex items-center gap-1 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-all ${
-              activeTab === 'visualizer' ? 'bg-white text-slate-950 shadow-md' : 'text-slate-300 hover:text-white'
+            onClick={() => {
+              triggerHaptic('tab');
+              setActiveTab('visualizer');
+            }}
+            className={`flex items-center gap-1.5 px-3.5 sm:px-5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'visualizer' ? 'bg-white text-slate-950 shadow-md font-bold' : 'text-slate-300 hover:text-white'
             }`}
           >
-            <Waves className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <Waves className="w-3.5 h-3.5" />
             <span>Visualizer</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
-          {/* More Like This */}
+        {/* Secondary Studio Controls */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={() => setMoreLikeThisOpen(true)}
+            onClick={() => {
+              triggerHaptic('button');
+              setMoreLikeThisOpen(true);
+            }}
             aria-label="More Like This"
-            title="More Like This (Related & Same Genre)"
-            className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors"
+            title="More Like This"
+            className="flex items-center gap-1.5 p-2 sm:px-3.5 sm:py-2 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5 text-[var(--aura-primary,#6366f1)]" />
-            <span className="hidden sm:inline">More Like This</span>
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">Discovery</span>
           </button>
 
-          {/* Car Group Play */}
           <button
-            onClick={() => setJamModalOpen(true)}
+            onClick={() => {
+              triggerHaptic('button');
+              setJamModalOpen(true);
+            }}
             aria-label="Car Group Play"
-            title="Car Group Play (Jam Session)"
-            className={`flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold transition-colors ${
-              jamRoom ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-white/10 hover:bg-white/20 text-white'
+            title="Car Group Play / Jam"
+            className={`flex items-center gap-1.5 p-2 sm:px-3.5 sm:py-2 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+              jamRoom ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' : 'bg-white/10 hover:bg-white/20 text-white'
             }`}
           >
             <Car className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{jamRoom ? 'Car Jam' : 'Group Play'}</span>
+            <span className="hidden sm:inline">{jamRoom ? 'Jam Active' : 'Group Play'}</span>
           </button>
 
-          {/* Studio EQ Console */}
           <button
-            onClick={() => setEqModalOpen(true)}
+            onClick={() => {
+              triggerHaptic('button');
+              setEqModalOpen(true);
+            }}
             aria-label="Open Equalizer Console"
             title="Studio Equalizer"
-            className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 sm:p-2.5 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <SlidersHorizontal className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
@@ -164,72 +185,87 @@ export const ExpandedPlayer: React.FC = () => {
       {/* Main Center Stage */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 sm:p-6 max-w-4xl mx-auto w-full overflow-y-auto no-scrollbar">
         
-        {/* TAB 1: Cinematic Artwork View */}
+        {/* TAB 1: Cinematic Artwork with Real Vinyl Record Presentation */}
         {activeTab === 'artwork' && (
-          <div className="flex flex-col items-center text-center max-w-md w-full animate-fadeIn my-auto">
-            <div 
-              className="relative w-52 h-52 sm:w-80 sm:h-80 rounded-2xl overflow-hidden shadow-2xl mb-4 sm:mb-8 border border-white/15 group"
-              style={{
-                boxShadow: '0 25px 50px -12px var(--aura-glow, rgba(0,0,0,0.7))',
-              }}
-            >
-              <SafeImage
-                src={currentTrack.artwork.high || currentTrack.artwork.medium}
-                alt={currentTrack.title}
-                type="track"
-                className={`w-full h-full object-cover transition-transform duration-700 ${
-                  isPlaying ? 'scale-105' : 'scale-100'
+          <div className="flex flex-col items-center text-center max-w-lg w-full animate-dwi-enter my-auto">
+            {/* Vinyl Record & Sleeve Stage */}
+            <div className="relative w-64 h-64 sm:w-84 sm:h-84 mb-6 sm:mb-8 flex items-center justify-center">
+              {/* Spinning Vinyl Record behind artwork */}
+              <div 
+                className={`absolute w-60 h-60 sm:w-80 sm:h-80 rounded-full bg-[#0a0a0f] border-2 border-slate-700/80 shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-700 ${
+                  isPlaying 
+                    ? 'translate-x-12 sm:translate-x-16 animate-vinyl-spin' 
+                    : 'translate-x-6 rotate-12'
                 }`}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60" />
+              >
+                <div className="absolute inset-0 vinyl-grooves opacity-75" />
+                <div className="relative w-1/3 h-1/3 rounded-full bg-gradient-to-br from-indigo-500 via-purple-600 to-cyan-500 flex items-center justify-center border border-white/20">
+                  <div className="w-4 h-4 rounded-full bg-[#07080c] border border-white/40" />
+                </div>
+              </div>
+
+              {/* Sleeve Art (Front) */}
+              <div 
+                className="relative z-10 w-60 h-60 sm:w-80 sm:h-80 rounded-3xl overflow-hidden shadow-2xl border border-white/15 bg-black"
+                style={{
+                  boxShadow: '0 25px 60px -12px rgba(99,102,241,0.3)',
+                }}
+              >
+                <SafeImage
+                  src={currentTrack.artwork.high || currentTrack.artwork.medium}
+                  alt={currentTrack.title}
+                  type="track"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-50" />
+              </div>
             </div>
 
             <div className="w-full flex items-center justify-between mb-2">
               <div className="text-left min-w-0 flex-1">
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-white truncate tracking-tight">
+                <h2 className="text-2xl sm:text-4xl font-black text-white truncate tracking-tight font-display">
                   {currentTrack.title}
                 </h2>
-                <p className="text-base text-slate-300 truncate mt-1">
+                <p className="text-base sm:text-lg text-slate-300 truncate mt-1 font-medium">
                   {currentTrack.primaryArtist} · {currentTrack.album.title}
                 </p>
               </div>
 
               <button
-                onClick={() => toggleLike(currentTrack)}
+                onClick={() => {
+                  triggerHaptic('like');
+                  toggleLike(currentTrack);
+                }}
                 aria-label={isLiked ? "Unlike song" : "Like song"}
-                className={`p-3 rounded-full transition-colors ml-4 shrink-0 ${
-                  isLiked ? 'text-rose-500 bg-rose-500/10' : 'text-slate-400 hover:text-white bg-white/5'
+                className={`p-3 rounded-full transition-all ml-4 shrink-0 cursor-pointer ${
+                  isLiked ? 'text-rose-500 bg-rose-500/15' : 'text-slate-400 hover:text-white bg-white/5'
                 }`}
               >
                 <Heart className={`w-6 h-6 ${isLiked ? 'fill-current' : ''}`} />
               </button>
             </div>
 
-            {/* Quality & Meta Tags (Clean unboxed typography) */}
+            {/* Quality & Meta Tags */}
             <div className="w-full flex items-center gap-2 text-xs text-slate-400 font-mono mt-1">
-              <span>320 KBPS AAC</span>
-              <span aria-hidden="true">·</span>
-              <span>{currentTrack.language}</span>
-              {currentTrack.year && (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <span>{currentTrack.year}</span>
-                </>
-              )}
+              <span className="text-indigo-400 font-bold">320 KBPS MASTER</span>
+              <span className="text-slate-600" aria-hidden="true">·</span>
+              <span className="text-cyan-400 font-bold">24-BIT / 96KHZ FLAC</span>
+              <span className="text-slate-600" aria-hidden="true">·</span>
+              <span>{currentTrack.language || 'Original Master'}</span>
             </div>
           </div>
         )}
 
         {/* TAB 2: Synced Lyrics View */}
         {activeTab === 'lyrics' && (
-          <div className="w-full h-full max-h-[550px] animate-fadeIn">
+          <div className="w-full h-full max-h-[550px] animate-dwi-enter">
             <SyncedLyricsView song={currentTrack} />
           </div>
         )}
 
         {/* TAB 3: Canvas Visualizer View */}
         {activeTab === 'visualizer' && (
-          <div className="w-full h-full max-h-[550px] animate-fadeIn">
+          <div className="w-full h-full max-h-[550px] animate-dwi-enter">
             <VisualizerCanvas showControls={true} />
           </div>
         )}
@@ -239,7 +275,7 @@ export const ExpandedPlayer: React.FC = () => {
       {/* Bottom Playback Controls Tray */}
       <div className="relative z-10 w-full max-w-3xl mx-auto px-6 pb-8 pt-2">
         
-        {/* Scrub Bar */}
+        {/* Scrub Bar with Radiant Glow */}
         <div className="w-full mb-3">
           <input
             type="range"
@@ -249,9 +285,9 @@ export const ExpandedPlayer: React.FC = () => {
             value={progress}
             onChange={handleSeekChange}
             aria-label="Playback seek scrub"
-            className="w-full h-1.5 bg-white/20 accent-[var(--aura-primary,#6366f1)] rounded-lg cursor-pointer"
+            className="w-full h-2 bg-white/20 accent-indigo-400 rounded-lg cursor-pointer"
           />
-          <div className="flex items-center justify-between text-xs font-mono text-slate-400 mt-1">
+          <div className="flex items-center justify-between text-xs font-mono text-slate-400 mt-1.5 tabular-nums">
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>
@@ -261,51 +297,67 @@ export const ExpandedPlayer: React.FC = () => {
         <div className="flex items-center justify-between mt-2">
           
           <button
-            onClick={toggleShuffle}
+            onClick={() => {
+              triggerHaptic('button');
+              toggleShuffle();
+            }}
             aria-label="Shuffle playback"
-            className={`p-2.5 rounded-full transition-colors ${
-              shuffle ? 'text-[var(--aura-primary,#6366f1)] bg-white/10' : 'text-slate-400 hover:text-white'
+            className={`p-3 rounded-full transition-colors cursor-pointer ${
+              shuffle ? 'text-indigo-400 bg-white/10 font-bold' : 'text-slate-400 hover:text-white'
             }`}
           >
             <Shuffle className="w-5 h-5" />
           </button>
 
           <button
-            onClick={prevTrack}
+            onClick={() => {
+              triggerHaptic('skipBack');
+              prevTrack();
+            }}
             aria-label="Previous track"
-            className="p-3 rounded-full text-slate-200 hover:text-white transition-colors"
+            className="p-3.5 rounded-full text-slate-200 hover:text-white active:scale-90 transition-all cursor-pointer"
           >
             <SkipBack className="w-7 h-7 fill-current" />
           </button>
 
+          {/* Big White Center Play Button with Radiant Aura */}
           <button
-            onClick={togglePlay}
+            onClick={() => {
+              triggerHaptic('button');
+              togglePlay();
+            }}
             aria-label={isPlaying ? "Pause" : "Play"}
             disabled={isLoading}
-            className="w-16 h-16 rounded-full bg-white text-slate-950 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-2xl cursor-pointer"
+            className="w-18 h-18 rounded-full bg-white text-slate-950 flex items-center justify-center hover:scale-106 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.4)] cursor-pointer"
           >
             {isLoading ? (
-              <div className="w-6 h-6 border-3 border-slate-900 border-t-transparent rounded-full animate-spin" />
+              <EqualizerLoader size="md" color="#090a0f" />
             ) : isPlaying ? (
-              <Pause className="w-7 h-7 fill-current" />
+              <Pause className="w-8 h-8 fill-current" />
             ) : (
-              <Play className="w-7 h-7 fill-current translate-x-0.5" />
+              <Play className="w-8 h-8 fill-current translate-x-0.5" />
             )}
           </button>
 
           <button
-            onClick={nextTrack}
+            onClick={() => {
+              triggerHaptic('skipForward');
+              nextTrack();
+            }}
             aria-label="Next track"
-            className="p-3 rounded-full text-slate-200 hover:text-white transition-colors"
+            className="p-3.5 rounded-full text-slate-200 hover:text-white active:scale-90 transition-all cursor-pointer"
           >
             <SkipForward className="w-7 h-7 fill-current" />
           </button>
 
           <button
-            onClick={cycleRepeat}
+            onClick={() => {
+              triggerHaptic('button');
+              cycleRepeat();
+            }}
             aria-label={`Repeat mode: ${repeat}`}
-            className={`p-2.5 rounded-full transition-colors ${
-              repeat !== 'off' ? 'text-[var(--aura-primary,#6366f1)] bg-white/10' : 'text-slate-400 hover:text-white'
+            className={`p-3 rounded-full transition-colors cursor-pointer ${
+              repeat !== 'off' ? 'text-indigo-400 bg-white/10 font-bold' : 'text-slate-400 hover:text-white'
             }`}
           >
             {repeat === 'one' ? <Repeat1 className="w-5 h-5" /> : <Repeat className="w-5 h-5" />}
@@ -313,29 +365,31 @@ export const ExpandedPlayer: React.FC = () => {
 
         </div>
 
-        {/* Secondary controls footer (Speed, Radio) */}
+        {/* Secondary controls footer (Speed) */}
         <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-white/5 text-xs text-slate-400">
-          
-          {/* Speed Selector */}
           <div className="relative">
             <button
-              onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-              className="flex items-center gap-1.5 hover:text-white transition-colors"
+              onClick={() => {
+                triggerHaptic('button');
+                setShowSpeedMenu(!showSpeedMenu);
+              }}
+              className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
             >
-              <Gauge className="w-3.5 h-3.5" />
-              <span>{playbackRate}x Speed</span>
+              <Gauge className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{playbackRate}x Playback Speed</span>
             </button>
 
             {showSpeedMenu && (
-              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-[#12141f] border border-white/10 rounded-xl p-1 shadow-xl flex gap-1 z-20">
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-[#0e111a] border border-white/10 rounded-2xl p-1.5 shadow-2xl flex gap-1 z-20">
                 {SPEED_OPTIONS.map((rate) => (
                   <button
                     key={rate}
                     onClick={() => {
+                      triggerHaptic('selection');
                       setPlaybackRate(rate);
                       setShowSpeedMenu(false);
                     }}
-                    className={`px-2 py-1 rounded text-xs font-mono ${
+                    className={`px-2.5 py-1 rounded-xl text-xs font-mono cursor-pointer ${
                       playbackRate === rate ? 'bg-white text-slate-900 font-bold' : 'text-slate-300 hover:text-white'
                     }`}
                   >
@@ -345,7 +399,6 @@ export const ExpandedPlayer: React.FC = () => {
               </div>
             )}
           </div>
-
         </div>
 
       </div>

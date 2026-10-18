@@ -101,7 +101,7 @@ export const OfflineToast: React.FC<OfflineToastProps> = ({ onOpenOfflineLibrary
     <div 
       role="alert"
       aria-live="assertive"
-      className="fixed bottom-22 sm:bottom-24 left-4 sm:left-8 z-40 max-w-sm sm:max-w-md w-[calc(100%-2rem)] sm:w-auto bg-[#10121d]/95 backdrop-blur-2xl border border-amber-500/40 rounded-2xl p-4 shadow-2xl text-slate-100 animate-fadeIn"
+      className="fixed bottom-22 sm:bottom-24 left-4 sm:left-8 z-40 max-w-sm sm:max-w-md w-[calc(100%-2rem)] sm:w-auto bg-[#0c0f18]/95 backdrop-blur-2xl border border-amber-500/40 rounded-3xl p-5 shadow-2xl text-slate-100 animate-dwi-enter"
       style={{
         boxShadow: '0 15px 35px -5px rgba(245, 158, 11, 0.25), 0 0 0 1px rgba(245, 158, 11, 0.1)',
       }}

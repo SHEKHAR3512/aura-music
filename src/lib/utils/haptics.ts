@@ -14,7 +14,9 @@ export type HapticType =
   | 'like'
   | 'button'
   | 'queue'
-  | 'selection';
+  | 'selection'
+  | 'tab'
+  | 'cardSelect';
 
 // Tactile millisecond vibration patterns
 const HAPTIC_PATTERNS: Record<HapticType, number | number[]> = {
@@ -36,6 +38,8 @@ const HAPTIC_PATTERNS: Record<HapticType, number | number[]> = {
   // Generic buttons & switches
   button: 10,
   selection: 6,
+  tab: 8,
+  cardSelect: 12,
 
   // Added to queue
   queue: [10, 40, 12],
