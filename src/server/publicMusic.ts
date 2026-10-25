@@ -34,7 +34,7 @@ const allowedAudio = (value: string) => {
   );
 };
 
-// Local experimental playback requested by the app owner. No media proxy,
+// Return the provider's HTTPS audio URL unchanged. No media proxy,
 // decryption, URL rewriting, subscription emulation or audio downloading.
 export async function resolvePublicRecording(
   id: string,
@@ -110,15 +110,6 @@ export async function resolvePublicRecording(
 
 export const publicMusic = Router();
 publicMusic.get("/songs/:id/playback", async (req, res) => {
-  if (process.env.NODE_ENV === "production") {
-    res
-      .status(403)
-      .json({
-        error:
-          "Experimental provider playback is available in local development only.",
-      });
-    return;
-  }
   try {
     res.setHeader("Cache-Control", "no-store");
     res.json(await resolvePublicRecording(req.params.id));
