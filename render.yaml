@@ -8,21 +8,18 @@ services:
     region: singapore   # Change to: oregon, frankfurt, ohio, virginia as needed
     plan: free          # Upgrade to 'starter' ($7/mo) for no sleep + better perf
 
-    buildCommand: rm -rf node_modules package-lock.json && npm install --force && npm run build
+    buildCommand: npm ci --workspaces=false --include=dev && npm run build
     startCommand: npm start
 
     # Health check — Render pings this to confirm your service is up
-    healthCheckPath: /api/music/charts
+    healthCheckPath: /api/v1/health
 
-    # Auto-deploy on every push to the main branch
-    autoDeploy: true
+    # Auto-deploy on every commit to the linked branch
+    autoDeployTrigger: commit
 
     envVars:
       - key: NODE_ENV
         value: production
-      - key: NODE_OPTIONS
-        value: "--max-old-space-size=384"
-
       # ── Firebase ──────────────────────────────────────────
       - key: VITE_FIREBASE_API_KEY
         sync: false   # Set manually in Render dashboard

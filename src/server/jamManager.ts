@@ -350,6 +350,7 @@ class JamSessionManager {
       }
 
       case 'jam:ping': {
+        ws.send(JSON.stringify({ type: 'jam:pong', data: { serverTimestamp: Date.now() } }));
         if (ws.sessionId && ws.deviceId) {
           const session = this.sessions.get(ws.sessionId);
           const member = session?.members.get(ws.deviceId);

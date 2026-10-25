@@ -13,6 +13,8 @@ import { jioSaavnProvider } from './src/lib/music/jiosaavn';
 import { fetchLyrics } from './src/lib/music/lyrics';
 import { CURATED_FEATURED_SONGS, CURATED_FEATURED_PLAYLISTS, CURATED_POPULAR_ARTISTS } from './src/lib/music/cache';
 import { jamManager } from './src/server/jamManager';
+import { mobileApi } from './src/server/mobileApi';
+import { publicMusic } from './src/server/publicMusic';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,6 +24,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use('/api/v1', mobileApi);
+app.use('/api/experimental', publicMusic);
 
 // -------------------------------------------------------------
 // MUSIC API ABSTRACTION ROUTES (Section 3 of Specification)
